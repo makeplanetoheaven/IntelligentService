@@ -16,7 +16,7 @@ from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
 # 引入内部库
 
 
-class LSTM_DSSM:
+class LstmDSSM:
 	def __init__ (self, q_set=None,  # 问题集,二维数组
 	              t_set=None,  # 答案集,二维数组
 	              dict_set=None,  # 字典集，[词]
@@ -25,8 +25,7 @@ class LSTM_DSSM:
 	              hidden_num=512,  # 隐藏层个数
 	              learning_rate=0.01,  # 学习率
 	              epoch_steps=100,  # 训练迭代次数
-	              gamma = 20, # 余弦相似度扩展参数
-	              model_path=None,  # 模型存储路径
+	              gamma = 20, # 余弦相似度平滑因子
 	              is_train = True  # 是否进行训练
 	              ):
 		# 外部参数
@@ -46,8 +45,8 @@ class LSTM_DSSM:
 		self.t_actual_length = []
 		self.q_max_length = 0
 		self.t_max_length = 0
-		self.model_save_name = model_path + 'LSTM_DSSM'
-		self.model_save_checkpoint = model_path + 'checkpoint'
+		self.model_save_name = './ModelMemory/SimNet/DSSM/LstmDSSM/model/LstmDSSM'
+		self.model_save_checkpoint = './ModelMemory/SimNet/DSSM/LstmDSSM/model/checkpoint'
 
 		# 模型参数
 		self.graph = None

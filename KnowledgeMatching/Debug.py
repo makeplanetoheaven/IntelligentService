@@ -6,5 +6,14 @@ function: 用于知识匹配模块的调试
 """
 
 # 引入外部库
+import pandas as pd
+import json
 
 # 引入内部库
+from KnowledgeMatching.SemanticSimMatching import *
+
+
+def test_semantic():
+	dssm_model_train()
+
+test_semantic()
