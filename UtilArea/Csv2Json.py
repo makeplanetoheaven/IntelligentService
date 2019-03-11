@@ -30,3 +30,19 @@ class Csv2Json():
                     f.write('\n')
         except (Exception) as e:
             print(e)
+
+    def cvs_to_json(self, csv_file_path, json_file_path):
+        df = pd.read_csv(csv_file_path)
+        with open(json_file_path, 'w', encoding='utf-8') as file_object:
+            temp_dict = []
+            key_list = []
+            for key in df:
+                key_list.append(key)
+            key_list.pop(0)
+            for i in range(len(df[key_list[0]])):
+                row_dict = {}
+                row_dict["index"] = i
+                for key in key_list:
+                    row_dict[key] = df[key][i].replace('\n', "").replace(' ', "")
+                temp_dict.append(row_dict)
+            json.dump(temp_dict, file_object, ensure_ascii=False, indent=2)

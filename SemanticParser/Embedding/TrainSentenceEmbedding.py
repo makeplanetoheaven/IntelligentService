@@ -2,11 +2,12 @@
 # @Author  : Lone Ranger
 # @Function :
 
+
+# 导入外部包
 import json
 import os
 
 import numpy as np
-# 导入外部包
 import pandas as pd
 from bert_serving.client import BertClient
 
@@ -14,6 +15,11 @@ from bert_serving.client import BertClient
 class GetSentenceEmbedding:
 
     def __init__(self, filepath, title, save_path):
+        """
+        :param filepath:待读取的文件名
+        :param title: csv中的标题
+        :param save_path: 存储地址
+        """
         self.filepath = filepath
         self.title = title
         self.save_path = save_path
@@ -49,13 +55,14 @@ class GetSentenceEmbedding:
         print('Starting Convert Sentences To Embedding' + '\n')
         try:
             bc = BertClient(ip='221.226.81.54', port=5555, port_out=5556)
+            print('%d questions loaded, avg. len of %d' % (
+                len(sentences), np.mean([len(sentence) for sentence in sentences])) + '\n')
+            sentences_vec = bc.encode(sentences)
+            print('Finishing Convert Sentences To Embedding' + '\n')
         except (Exception) as e:
             print(e)
             print("Cannot Connect To Bert-Server" + '\n')
-        print('%d questions loaded, avg. len of %d' % (
-            len(sentences), np.mean([len(sentence) for sentence in sentences])) + '\n')
-        sentences_vec = bc.encode(sentences)
-        print('Finishing Convert Sentences To Embedding' + '\n')
+
         return sentences_vec
 
     def save_sentence_embedding(self, save_path, save_name, sentences_embedding):
