@@ -35,6 +35,9 @@ def dssm_model_train():
 	embedding_set = []
 	with open(embedding_path, 'r', encoding='utf-8') as file_object:
 		embedding_dict = json.load(file_object)
+		for element in embedding_dict:
+			word_set.append(element)
+			embedding_set.append(element)
 
 	# 模型训练
 	dssm = LstmDSSM(q_set=query_set,t_set=answer_set,dict_set=word_set,vec_set=embedding_set)
