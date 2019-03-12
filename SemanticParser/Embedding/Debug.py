@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # debug traincharacterembedding
     emb_path = root_path + '\\KnowledgeMemory' + '\\Embedding' + '\\CharacterEmbedding'
     print(emb_path)
-    json_question_character_embedding_path = '\\characters_embedding.json'
+    json_question_character_embedding_path = '\\CharactersEmbedding.json'
     # json_answer_character_embedding_path = '\\answer_characters_embedding.json'
     train = TrainCharacterEmbedding(json_faq_path, emb_path)
     dataframe = train.get_text()

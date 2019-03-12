@@ -8,6 +8,7 @@ function: 通过使用BI-LSTM作为表示层进行语义相似度计算,该模�
 # 引入外部库
 import os
 import random
+import time
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
@@ -16,17 +17,18 @@ from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
 # 引入内部库
 
 
-class LstmDSSM:
+class GruDSSM:
 	def __init__ (self, q_set=None,  # 问题集,二维数组
 	              t_set=None,  # 答案集,二维数组
 	              dict_set=None,  # 字典集，[词]
 	              vec_set=None,  # 向量集，[向量]，与dict_set顺序一致,
 				  negative_sample_num=50, # 负采样数目
-	              hidden_num=512,  # 隐藏层个数
+	              hidden_num=1024,  # 隐藏层个数
 	              learning_rate=0.01,  # 学习率
-	              epoch_steps=100,  # 训练迭代次数
-	              gamma = 20, # 余弦相似度平滑因子
-	              is_train = True  # 是否进行训练
+	              epoch_steps=300,  # 训练迭代次数
+	              gamma=20, # 余弦相似度平滑因子
+	              is_train=True,  # 是否进行训练
+				  top_k=1 # 返回候选问题数目
 	              ):
 		# 外部参数
 		self.q_set = q_set
@@ -41,12 +43,15 @@ class LstmDSSM:
 		self.is_train = is_train
 
 		# 内部参数
+		self.top_k_answer = top_k
+		self.batch_size = 0
+		self.q_length = 0
 		self.q_actual_length = []
 		self.t_actual_length = []
 		self.q_max_length = 0
 		self.t_max_length = 0
-		self.model_save_name = './ModelMemory/SimNet/DSSM/LstmDSSM/model/LstmDSSM'
-		self.model_save_checkpoint = './ModelMemory/SimNet/DSSM/LstmDSSM/model/checkpoint'
+		self.model_save_name = './ModelMemory/SimNet/DSSM/GruDSSM/model/gruDSSM'
+		self.model_save_checkpoint = './ModelMemory/SimNet/DSSM/GruDSSM/model/checkpoint'
 
 		# 模型参数
 		self.graph = None
@@ -56,12 +61,18 @@ class LstmDSSM:
 		self.q_inputs_actual_length = None
 		self.t_inputs = None
 		self.t_inputs_actual_length = None
-		self.output = None
+		self.outputs = None
 		self.accuracy = None
 		self.loss = None
 		self.train_op = None
 
 	def init_model_parameters (self):
+		# 获取问题数据大小
+		self.batch_size = len(self.q_set)
+
+		# 获取答案数据大小
+		self.q_length = len(self.t_set)
+
 		# 获取q_set实际长度及最大长度
 		for data in self.q_set:
 			self.q_actual_length.append(len(data))
@@ -113,7 +124,7 @@ class LstmDSSM:
 
 		pass
 
-	def presentation_bi_lstm (self, inputs, inputs_actual_length, reuse=None):
+	def presentation_bi_gru (self, inputs, inputs_actual_length, reuse=None):
 		with tf.variable_scope('presentation_layer', reuse=reuse):
 			# 正向
 			fw_cell = GRUCell(num_units=self.hidden_num)
@@ -139,14 +150,14 @@ class LstmDSSM:
 		return final_state
 
 	def matching_layer_training (self, q_final_state, t_final_state):
-		with tf.name_scope('Train Progress'):
+		with tf.name_scope('TrainProgress'):
 			# 负采样
 			t_temp_state = tf.tile(t_final_state, [1, 1])
-			batch_size = self.q_inputs.get_shape[0]
 			for i in range(self.negative_sample_num):
-				rand = int((random.random() + i) * batch_size / self.negative_sample_num)
-				t_final_state = tf.concat(0, [t_final_state, tf.slice(t_temp_state, [rand, 0], [batch_size - rand, -1]),
-				                              tf.slice(t_temp_state, [0, 0], [rand, -1])])
+				rand = int((random.random() + i) * self.batch_size / self.negative_sample_num)
+				t_final_state = tf.concat((t_final_state,
+				                           tf.slice(t_temp_state, [rand, 0], [self.batch_size - rand, -1]),
+				                           tf.slice(t_temp_state, [0, 0], [rand, -1])), 0)
 
 			# ||q|| * ||t||
 			q_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(q_final_state), 1, True)),
@@ -161,23 +172,24 @@ class LstmDSSM:
 			# cosine
 			cos_sim_raw = tf.truediv(prod, norm_prod)
 			cos_sim = tf.transpose(
-				tf.reshape(tf.transpose(cos_sim_raw), [self.negative_sample_num + 1, batch_size])) * self.gamma
+				tf.reshape(tf.transpose(cos_sim_raw), [self.negative_sample_num + 1, self.batch_size])) * self.gamma
 
 		return cos_sim
 
 	def matching_layer_infer (self, q_final_state, t_final_state):
-		with tf.name_scope('Infer Progress'):
+		with tf.name_scope('InferProgress'):
 			# ||q|| * ||t||
 			q_norm = tf.tile(tf.transpose(tf.sqrt(tf.reduce_sum(tf.square(q_final_state), 1, True))),
-			                 [t_final_state.get_shape[0], 1])
-			t_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True)), [1, q_final_state.get_shape[0]])
+			                 [self.q_length, 1])
+			t_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True)), [1, self.batch_size])
 			norm_prod = tf.transpose(tf.multiply(q_norm, t_norm))
 
 			# qT * d
 			prod = tf.reshape(tf.transpose(tf.reduce_sum(tf.multiply(
-				tf.tile(tf.reshape(q_final_state, [1, self.hidden_num, -1]), [t_final_state.get_shape[0], 1, 1]),
-				tf.tile(tf.reshape(t_final_state, [-1, self.hidden_num, 1]), [1, 1, q_final_state.get_shape[0]])), 1,
-				True), [2, 0, 1]), [-1, t_final_state.get_shape[0]])
+				tf.tile(tf.transpose(tf.reshape(q_final_state, [-1, self.hidden_num * 2, 1]), [2, 1, 0]),
+				        [self.q_length, 1, 1]),
+				tf.tile(tf.reshape(t_final_state, [-1, self.hidden_num * 2, 1]), [1, 1, self.batch_size])), 1, True),
+				[2, 0, 1]), [self.batch_size, self.q_length])
 
 			# cosine
 			cos_sim = tf.truediv(prod, norm_prod) * self.gamma
@@ -190,14 +202,14 @@ class LstmDSSM:
 		with self.graph.as_default():
 			with tf.name_scope('placeholder'):
 				# 定义Q输入
-				self.q_inputs = tf.placeholder(dtype=tf.float32, shape=[None, self.q_max_length])
+				self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.q_max_length])
 				self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
 				# 定义T输入
-				self.t_inputs = tf.placeholder(dtype=tf.float32, shape=[None, self.t_max_length])
+				self.t_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.t_max_length])
 				self.t_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
-			with tf.name_scope('Input Layer'):
+			with tf.name_scope('InputLayer'):
 				# 定义词向量
 				embeddings = tf.constant(self.vec_set)
 
@@ -205,27 +217,28 @@ class LstmDSSM:
 				q_embeddings = tf.nn.embedding_lookup(embeddings, self.q_inputs)
 				t_embeddings = tf.nn.embedding_lookup(embeddings, self.t_inputs)
 
-			with tf.name_scope('Presentation Layer'):
-				q_final_state = self.presentation_bi_lstm(q_embeddings, self.q_inputs_actual_length)
-				t_final_state = self.presentation_bi_lstm(t_embeddings, self.t_inputs_actual_length, reuse=True)
+			with tf.name_scope('PresentationLayer'):
+				q_final_state = self.presentation_bi_gru(q_embeddings, self.q_inputs_actual_length)
+				t_final_state = self.presentation_bi_gru(t_embeddings, self.t_inputs_actual_length, reuse=True)
 
-			with tf.name_scope('Matching Layer'):
-				cos_sim = tf.cond(self.is_train, self.matching_layer_training(q_final_state, t_final_state),
-				                  self.matching_layer_infer(q_final_state, t_final_state))
+			with tf.name_scope('MatchingLayer'):
+				cos_sim_train = self.matching_layer_training(q_final_state, t_final_state)
+				cos_sim_infer = self.matching_layer_infer(q_final_state, t_final_state)
 
 			with tf.name_scope('Loss'):
 				# softmax归一化并输出
-				prob = tf.nn.softmax(cos_sim)
-				self.output = tf.argmax(prob, axis=1)
+				prob_train = tf.nn.softmax(cos_sim_train)
+				prob_infer = tf.nn.softmax(cos_sim_infer)
+				output_train = tf.argmax(prob_train, axis=1)
+				_, self.outputs = tf.nn.top_k(prob_infer, self.top_k_answer)
 
 				# 取正样本
-				batch_size = self.q_inputs.get_shape[0]
-				hit_prob = tf.slice(prob, [0, 0], [-1, 1])
-				self.loss = -tf.reduce_sum(tf.log(hit_prob)) / batch_size
+				hit_prob = tf.slice(prob_train, [0, 0], [-1, 1])
+				self.loss = -tf.reduce_sum(tf.log(hit_prob)) / self.batch_size
 
 			with tf.name_scope('Accuracy'):
-				self.accuracy = tf.reduce_sum(tf.cast(tf.equal(self.output, tf.zeros_like(self.output)))) / \
-				                self.q_inputs.get_shape[0]
+				self.accuracy = tf.reduce_sum(
+					tf.cast(tf.equal(output_train, tf.zeros_like(output_train)), dtype=tf.float32)) / self.batch_size
 
 			# 优化并进行梯度修剪
 			with tf.name_scope('Train'):
@@ -254,15 +267,18 @@ class LstmDSSM:
 				print('Initializing------')
 				tf.initialize_all_variables().run()
 
-			# 开始迭代 使用Adam优化的随机梯度下降法
+			# 开始迭代，使用Adam优化的随机梯度下降法，并将结果输出到日志文件
 			print('training------')
+			file_object = open('./ModelMemory/SimNet/DSSM/GruDSSM/log/' + time.strftime('%Y-%m-%d', time.localtime(
+				time.time())) + '.log', 'w', encoding='utf-8')
 			for i in range(self.epoch_steps):
 				# 开始训练
-				feed_dict = {self.q_inputs: self.t_set, self.q_inputs_actual_length: self.t_actual_length,
-				             self.t_inputs: self.q_set, self.t_inputs_actual_length: self.q_actual_length}
+				feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
+				             self.t_inputs: self.t_set, self.t_inputs_actual_length: self.t_actual_length}
 				_, loss, accuracy = self.session.run([self.train_op, self.loss, self.accuracy], feed_dict=feed_dict)
 
-				print('Average loss at step %d: %f' % (i, loss[0]))
+				file_object.write('[epoch:%d] loss %f accuracy %f\n' % (i, loss, accuracy))
+			file_object.close()
 
 			# 保存模型
 			print('save model------')
@@ -274,8 +290,8 @@ class LstmDSSM:
 		with tf.Session(graph=self.graph) as self.session:
 			self.saver.restore(self.session, self.model_save_name)
 
-			feed_dict = {self.q_inputs: self.t_set, self.q_inputs_actual_length: self.t_actual_length,
-			             self.t_inputs: self.q_set, self.t_inputs_actual_length: self.q_actual_length}
-			result = self.session.run(self.output, feed_dict=feed_dict)
+			feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
+			             self.t_inputs: self.t_set, self.t_inputs_actual_length: self.t_actual_length}
+			results = self.session.run(self.outputs, feed_dict=feed_dict)
 
-			return result
+			return results
