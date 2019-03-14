@@ -14,6 +14,7 @@ from Run import *
 
 
 def test_get_answer():
-	print(get_answer(["帐号密码不正确", "供应商账户信息找不到开户银行"]))
+	init_system()
+	print(get_answer(["营收数据重复了"], top_k=1))
 
 test_get_answer()

@@ -22,10 +22,10 @@ class GruDSSM:
 	              t_set=None,  # 答案集,二维数组
 	              dict_set=None,  # 字典集，[词]
 	              vec_set=None,  # 向量集，[向量]，与dict_set顺序一致,
-				  negative_sample_num=50, # 负采样数目
-	              hidden_num=1024,  # 隐藏层个数
-	              learning_rate=0.01,  # 学习率
-	              epoch_steps=300,  # 训练迭代次数
+				  negative_sample_num=100, # 负采样数目
+	              hidden_num=768,  # 隐藏层个数
+	              learning_rate=0.1,  # 学习率
+	              epoch_steps=200,  # 训练迭代次数
 	              gamma=20, # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
 				  top_k=1 # 返回候选问题数目
@@ -45,7 +45,7 @@ class GruDSSM:
 		# 内部参数
 		self.top_k_answer = top_k
 		self.batch_size = 0
-		self.q_length = 0
+		self.t_size = 0
 		self.q_actual_length = []
 		self.t_actual_length = []
 		self.q_max_length = 0
@@ -71,7 +71,7 @@ class GruDSSM:
 		self.batch_size = len(self.q_set)
 
 		# 获取答案数据大小
-		self.q_length = len(self.t_set)
+		self.t_size = len(self.t_set)
 
 		# 获取q_set实际长度及最大长度
 		for data in self.q_set:
@@ -126,26 +126,21 @@ class GruDSSM:
 
 	def presentation_bi_gru (self, inputs, inputs_actual_length, reuse=None):
 		with tf.variable_scope('presentation_layer', reuse=reuse):
-			# 正向
-			fw_cell = GRUCell(num_units=self.hidden_num)
-			drop_fw_cell = DropoutWrapper(fw_cell, output_keep_prob=0.5)
-
-			# 反向
-			bw_cell = GRUCell(num_units=self.hidden_num)
-			drop_bw_cell = DropoutWrapper(bw_cell, output_keep_prob=0.5)
+			gru_cells = []
+			for i in range(6):
+				gru_cells.append(GRUCell(num_units=self.hidden_num))
+			drop_gru_cells = DropoutWrapper(gru_cells, output_keep_prob=0.5)
 
 			# 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出是一个元组 每一个元素也是这种形状
 			if self.is_train:
-				_, (presentation_fw_final_state, presentation_bw_final_state) = tf.nn.bidirectional_dynamic_rnn(
-					cell_fw=drop_fw_cell, cell_bw=drop_bw_cell, inputs=inputs, sequence_length=inputs_actual_length,
-					dtype=tf.float32)
+				hidden_out, states = tf.nn.dynamic_rnn(cell=drop_gru_cells, inputs=inputs,
+				                                       sequence_length=inputs_actual_length, dtype=tf.float32)
 			else:
-				_, (presentation_fw_final_state, presentation_bw_final_state) = tf.nn.bidirectional_dynamic_rnn(
-					cell_fw=fw_cell, cell_bw=bw_cell, inputs=inputs, sequence_length=inputs_actual_length,
-					dtype=tf.float32)
+				hidden_out, states = tf.nn.dynamic_rnn(cell=gru_cells, inputs=inputs,
+				                                       sequence_length=inputs_actual_length, dtype=tf.float32)
 
-			# hiddens的长度为2，其中每一个元素代表一个方向的隐藏状态序列，将每一时刻的输出合并成一个输出
-			final_state = tf.concat((presentation_fw_final_state, presentation_bw_final_state), 1)
+			# 注意这里输出需要转置  转换为时序优先的
+			final_state = tf.transpose(hidden_out, [1, 0, 2])[-1]
 
 		return final_state
 
@@ -180,16 +175,16 @@ class GruDSSM:
 		with tf.name_scope('InferProgress'):
 			# ||q|| * ||t||
 			q_norm = tf.tile(tf.transpose(tf.sqrt(tf.reduce_sum(tf.square(q_final_state), 1, True))),
-			                 [self.q_length, 1])
+			                 [self.t_size, 1])
 			t_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True)), [1, self.batch_size])
 			norm_prod = tf.transpose(tf.multiply(q_norm, t_norm))
 
 			# qT * d
 			prod = tf.reshape(tf.transpose(tf.reduce_sum(tf.multiply(
 				tf.tile(tf.transpose(tf.reshape(q_final_state, [-1, self.hidden_num * 2, 1]), [2, 1, 0]),
-				        [self.q_length, 1, 1]),
+				        [self.t_size, 1, 1]),
 				tf.tile(tf.reshape(t_final_state, [-1, self.hidden_num * 2, 1]), [1, 1, self.batch_size])), 1, True),
-				[2, 0, 1]), [self.batch_size, self.q_length])
+				[2, 0, 1]), [self.batch_size, self.t_size])
 
 			# cosine
 			cos_sim = tf.truediv(prod, norm_prod) * self.gamma
