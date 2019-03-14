@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # content = solution.get_text(faq_path, title='问题')
     # content = solution.df2list(content)
     # sen_vec = solution.get_sentence_embedding(content)
-    # result = solution.save_sentence_embedding(save_path=emb_path, save_name='sentences_embedding.json', sentences_embedding=sen_vec)
+    # result = solution.save_sentence_embedding(save_path=emb_path, save_name='SentencesEmbedding.json', sentences_embedding=sen_vec)
 
     # debug csv2json
     # c2j = Csv2Json(read_path=faq_path, write_path=json_faq_path)
