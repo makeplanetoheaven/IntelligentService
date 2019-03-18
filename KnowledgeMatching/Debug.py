@@ -11,9 +11,11 @@ import json
 
 # 引入内部库
 from KnowledgeMatching.SemanticSimMatching import *
+from Run import *
 
 
 def test_semantic():
-	dssm_model_train()
+	init_system()
+	dssm_model_train('AttentionDSSM')
 
 test_semantic()

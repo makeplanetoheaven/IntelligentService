@@ -20,16 +20,15 @@ def _init ():  # 初始化
 	_global_dict['FAQ_PATH'] = './KnowledgeMemory/FAQ/FAQ.json'
 
 	print('loading dir BERT_CHARACTER_EMBEDDING_PATH')
-	_global_dict['BERT_CHARACTER_EMBEDDING_PATH'] = './KnowledgeMemory/Embedding/BERT/CharacterEmbedding/CharactersEmbedding.json'
+	_global_dict['BERT_CHARACTER_EMBEDDING_PATH'] = './KnowledgeMemory/Embedding/BERT/CharactersEmbedding.json'
 
-	print('loading dir FAQ_DATA')
+	print('loading data FAQ_DATA')
 	with open('./KnowledgeMemory/FAQ/FAQ.json', 'r', encoding='utf-8') as file_object:
 		_global_dict['FAQ_DATA'] = json.load(file_object)
 
-	print('loading dir CHARACTER_EMBEDDING')
-	with open('./KnowledgeMemory/Embedding/CharacterEmbedding/CharactersEmbedding.json', 'r',
-	          encoding='utf-8') as file_object:
-		_global_dict['CHARACTER_EMBEDDING'] = json.load(file_object)
+	print('loading data Word2Vec_CHARACTER_EMBEDDING')
+	with open('./KnowledgeMemory/Embedding/Word2Vec/CharactersEmbedding.json', 'r', encoding='utf-8') as file_object:
+		_global_dict['Word2Vec_CHARACTER_EMBEDDING'] = json.load(file_object)
 
 
 def set_value (key, value):

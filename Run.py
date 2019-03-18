@@ -22,7 +22,7 @@ def init_system ():
 	GlobalVariable._init()
 
 
-def get_answer (queries, top_k=1):
+def get_answer (queries, model_name='MultiGruModel',top_k=1):
 	"""
 	根据输入的多个问题，获取每个问题对应的前k个答案
 	:param queries: 问题列表
@@ -31,15 +31,25 @@ def get_answer (queries, top_k=1):
 	"""
 	print('get answer---------')
 	# 调用模型计算，获取每一个问题对应top-k个答案ID
-	answer_id_list = dssm_model_infer(queries, top_k)
+	answer_id_list = dssm_model_infer(queries, model_name=model_name,top_k=top_k)
 
-	# 数据加载并获取指定ID答案
-	answer_set = []
+	# 数据加载
 	faq_dict = GlobalVariable.get_value('FAQ_DATA')
+
+	# 获取指定ID问题
+	query_set = []
+	for answer in answer_id_list:
+		query_list = []
+		for id in answer:
+			query_list.append(faq_dict[id]["问题"])
+		query_set.append(query_list)
+
+	# 获取指定ID答案
+	answer_set = []
 	for answer in answer_id_list:
 		answer_list = []
 		for id in answer:
 			answer_list.append(faq_dict[id]["答案"])
 		answer_set.append(answer_list)
 
-	return answer_set
+	return query_set, answer_set
