@@ -10,7 +10,7 @@ import os
 import random
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.rnn import GRUCell, MultiRNNCell, DropoutWrapper
+from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
 
 
 # 引入内部库
@@ -28,6 +28,7 @@ class AttentionDSSM:
 	              epoch_steps=200,  # 训练迭代次数
 	              gamma=20, # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
+	              is_extract = False, # 是否进行t特征提取
 				  top_k=1 # 返回候选问题数目
 	              ):
 		# 外部参数
@@ -42,6 +43,7 @@ class AttentionDSSM:
 		self.epoch_steps = epoch_steps
 		self.gamma = gamma
 		self.is_train = is_train
+		self.is_extract = is_extract
 		self.top_k_answer = top_k
 
 		# 内部参数
@@ -63,6 +65,7 @@ class AttentionDSSM:
 		self.q_inputs_actual_length = None
 		self.t_inputs = None
 		self.t_inputs_actual_length = None
+		self.t_final_state = None
 		self.outputs = None
 		self.accuracy = None
 		self.loss = None
@@ -70,38 +73,41 @@ class AttentionDSSM:
 
 	def init_model_parameters (self):
 		print('Initializing------')
-		# 获取问题数据大小
-		self.q_size = len(self.q_set)
+		if not self.is_extract:
+			# 获取问题数据大小
+			self.q_size = len(self.q_set)
+
+			if self.batch_size is None:
+				self.batch_size = self.q_size
+
+			self.negative_sample_num = self.q_size // 10
 
 		# 获取答案数据大小
 		self.t_size = len(self.t_set)
 
-		if self.batch_size is None:
-			self.batch_size = self.q_size
+		if not self.is_extract:
+			# 获取q_set实际长度及最大长度
+			for data in self.q_set:
+				self.q_actual_length.append(len(data))
+			self.q_max_length = max(self.q_actual_length)
+			print('the max length of q set is %d' % self.q_max_length)
 
-		self.negative_sample_num = self.q_size // 10
+			# q_set数据补全
+			for i in range(len(self.q_set)):
+				if len(self.q_set[i]) < self.q_max_length:
+					self.q_set[i] = self.q_set[i] + ['UNK' for _ in range(self.q_max_length - len(self.q_set[i]))]
 
-		# 获取q_set实际长度及最大长度
-		for data in self.q_set:
-			self.q_actual_length.append(len(data))
-		self.q_max_length = max(self.q_actual_length)
-		print('the max length of q set is %d' % self.q_max_length)
+		if self.is_train:
+			# 获取t_set实际长度及最大长度
+			for data in self.t_set:
+				self.t_actual_length.append(len(data))
+			self.t_max_length = max(self.t_actual_length)
+			print('the max length of t set is %d' % self.t_max_length)
 
-		# q_set数据补全
-		for i in range(len(self.q_set)):
-			if len(self.q_set[i]) < self.q_max_length:
-				self.q_set[i] = self.q_set[i] + ['UNK' for _ in range(self.q_max_length - len(self.q_set[i]))]
-
-		# 获取t_set实际长度及最大长度
-		for data in self.t_set:
-			self.t_actual_length.append(len(data))
-		self.t_max_length = max(self.t_actual_length)
-		print('the max length of t set is %d' % self.t_max_length)
-
-		# t_set数据补全
-		for i in range(len(self.t_set)):
-			if len(self.t_set[i]) < self.t_max_length:
-				self.t_set[i] = self.t_set[i] + ['UNK' for _ in range(self.t_max_length - len(self.t_set[i]))]
+			# t_set数据补全
+			for i in range(len(self.t_set)):
+				if len(self.t_set[i]) < self.t_max_length:
+					self.t_set[i] = self.t_set[i] + ['UNK' for _ in range(self.t_max_length - len(self.t_set[i]))]
 
 		pass
 
@@ -109,23 +115,25 @@ class AttentionDSSM:
 		# 最后一行表示字典中没有词的词向量,正态分布初始化
 		self.vec_set.append(list(np.random.randn(len(self.vec_set[0]))))
 
-		# 将q_set每一个字转换为其在字典中的序号
-		for i in range(len(self.q_set)):
-			for j in range(len(self.q_set[i])):
-				if self.q_set[i][j] in self.dict_set:
-					self.q_set[i][j] = self.dict_set[self.q_set[i][j]]
-				else:
-					self.q_set[i][j] = len(self.vec_set) - 1
-		self.q_set = np.array(self.q_set)
+		if not self.is_extract:
+			# 将q_set每一个字转换为其在字典中的序号
+			for i in range(len(self.q_set)):
+				for j in range(len(self.q_set[i])):
+					if self.q_set[i][j] in self.dict_set:
+						self.q_set[i][j] = self.dict_set[self.q_set[i][j]]
+					else:
+						self.q_set[i][j] = len(self.vec_set) - 1
+			self.q_set = np.array(self.q_set)
 
-		# 将t_set每一个字转换为其在字典中的向量
-		for i in range(len(self.t_set)):
-			for j in range(len(self.t_set[i])):
-				if self.t_set[i][j] in self.dict_set:
-					self.t_set[i][j] = self.dict_set[self.t_set[i][j]]
-				else:
-					self.t_set[i][j] = len(self.vec_set) - 1
-		self.t_set = np.array(self.t_set)
+		if self.is_train:
+			# 将t_set每一个字转换为其在字典中的向量
+			for i in range(len(self.t_set)):
+				for j in range(len(self.t_set[i])):
+					if self.t_set[i][j] in self.dict_set:
+						self.t_set[i][j] = self.dict_set[self.t_set[i][j]]
+					else:
+						self.t_set[i][j] = len(self.vec_set) - 1
+			self.t_set = np.array(self.t_set)
 
 		pass
 
@@ -162,6 +170,7 @@ class AttentionDSSM:
 				alphas = tf.nn.softmax(vu, name='alphas')  # (B,T) shape
 
 				# Output of (Bi-)RNN is reduced with attention vector; the result has (B,D) shape
+				# tf.expand_dims用于在指定维度增加一维
 				attention_output = tf.reduce_sum(structure_output * tf.expand_dims(alphas, -1), 1)
 
 		return attention_output
@@ -218,56 +227,67 @@ class AttentionDSSM:
 		with self.graph.as_default():
 			with tf.name_scope('placeholder'):
 				# 定义Q输入
-				self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.q_max_length])
-				self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
+				if not self.is_extract:
+					self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.q_max_length])
+					self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
 				# 定义T输入
-				self.t_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.t_max_length])
-				self.t_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
+				if self.is_train:
+					self.t_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.t_max_length])
+					self.t_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
 			with tf.name_scope('InputLayer'):
 				# 定义词向量
 				embeddings = tf.constant(self.vec_set)
 
 				# 将句子中的每个字转换为字向量
-				q_embeddings = tf.nn.embedding_lookup(embeddings, self.q_inputs)
-				t_embeddings = tf.nn.embedding_lookup(embeddings, self.t_inputs)
+				if not self.is_extract:
+					q_embeddings = tf.nn.embedding_lookup(embeddings, self.q_inputs)
+				if self.is_train:
+					t_embeddings = tf.nn.embedding_lookup(embeddings, self.t_inputs)
 
 			with tf.name_scope('PresentationLayer'):
-				q_final_state = self.presentation_bi_attention(q_embeddings, self.q_inputs_actual_length)
-				t_final_state = self.presentation_bi_attention(t_embeddings, self.t_inputs_actual_length, reuse=True)
-
-			with tf.name_scope('MatchingLayer'):
-				if self.is_train:
-					cos_sim = self.matching_layer_training(q_final_state, t_final_state)
+				if not self.is_extract:
+					q_final_state = self.presentation_bi_attention(q_embeddings, self.q_inputs_actual_length)
+				if self.is_train and self.is_extract:
+					self.t_final_state = self.presentation_bi_attention(t_embeddings, self.t_inputs_actual_length)
+				elif self.is_train:
+					self.t_final_state = self.presentation_bi_attention(t_embeddings, self.t_inputs_actual_length,
+					                                                    reuse=True)
 				else:
-					cos_sim = self.matching_layer_infer(q_final_state, t_final_state)
+					self.t_final_state = tf.placeholder(dtype=tf.float32, shape=[None, self.hidden_num * 2])
 
-			with tf.name_scope('Loss'):
+			if not self.is_extract:
+				with tf.name_scope('MatchingLayer'):
+					if self.is_train:
+						cos_sim = self.matching_layer_training(q_final_state, self.t_final_state)
+					else:
+						cos_sim = self.matching_layer_infer(q_final_state, self.t_final_state)
+
 				# softmax归一化并输出
 				prob = tf.nn.softmax(cos_sim)
-				output_train = tf.argmax(prob, axis=1)
 				_, self.outputs = tf.nn.top_k(prob, self.top_k_answer)
 
-				# 取正样本
-				hit_prob = tf.slice(prob, [0, 0], [-1, 1])
-				self.loss = -tf.reduce_sum(tf.log(hit_prob)) / self.batch_size
+				if self.is_train:
+					with tf.name_scope('Loss'):
+						# 取正样本
+						hit_prob = tf.slice(prob, [0, 0], [-1, 1])
+						self.loss = -tf.reduce_sum(tf.log(hit_prob)) / self.batch_size
 
-			with tf.name_scope('Accuracy'):
-				self.accuracy = tf.reduce_sum(
-					tf.cast(tf.equal(output_train, tf.zeros_like(output_train)), dtype=tf.float32)) / self.batch_size
+					with tf.name_scope('Accuracy'):
+						output_train = tf.argmax(prob, axis=1)
+						self.accuracy = tf.reduce_sum(
+							tf.cast(tf.equal(output_train, tf.zeros_like(output_train)), dtype=tf.float32)) / self.batch_size
 
-			# 优化并进行梯度修剪
-			with tf.name_scope('Train'):
-				optimizer = tf.train.AdamOptimizer(self.learning_rate)
-				# 分解成梯度列表和变量列表
-				grads, vars = zip(*optimizer.compute_gradients(self.loss))
-
-				# 梯度修剪
-				gradients, _ = tf.clip_by_global_norm(grads, 5)  # clip gradients
-
-				# 将每个梯度以及对应变量打包
-				self.train_op = optimizer.apply_gradients(zip(gradients, vars))
+					# 优化并进行梯度修剪
+					with tf.name_scope('Train'):
+						optimizer = tf.train.AdamOptimizer(self.learning_rate)
+						# 分解成梯度列表和变量列表
+						grads, vars = zip(*optimizer.compute_gradients(self.loss))
+						# 梯度修剪
+						gradients, _ = tf.clip_by_global_norm(grads, 5)  # clip gradients
+						# 将每个梯度以及对应变量打包
+						self.train_op = optimizer.apply_gradients(zip(gradients, vars))
 
 			# 设置模型存储所需参数
 			self.saver = tf.train.Saver()
@@ -311,7 +331,16 @@ class AttentionDSSM:
 			self.saver.restore(self.session, self.model_save_name)
 
 			feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
-			             self.t_inputs: self.t_set, self.t_inputs_actual_length: self.t_actual_length}
+			             self.t_final_state:self.t_set}
 			results = self.session.run(self.outputs, feed_dict=feed_dict)
 
 			return results
+
+	def extract_t_pre(self):
+		with tf.Session(graph=self.graph) as self.session:
+			self.saver.restore(self.session, self.model_save_name)
+
+			feed_dict = {self.t_inputs: self.t_set, self.t_inputs_actual_length: self.t_actual_length}
+			t_state = self.session.run(self.t_final_state, feed_dict=feed_dict)
+
+			return t_state

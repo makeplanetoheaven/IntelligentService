@@ -26,4 +26,8 @@ def test_get_answer ():
 		print('--------------------------------')
 
 
-test_get_answer()
+def test_run ():
+	run()
+
+
+test_run()

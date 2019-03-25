@@ -31,7 +31,7 @@ class Csv2Json():
         except (Exception) as e:
             print(e)
 
-    def cvs_to_json(self, csv_file_path, json_file_path):
+    def csv_to_json(self, csv_file_path, json_file_path):
         df = pd.read_csv(csv_file_path)
         with open(json_file_path, 'w', encoding='utf-8') as file_object:
             temp_dict = []

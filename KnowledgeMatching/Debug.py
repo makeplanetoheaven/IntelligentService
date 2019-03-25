@@ -16,6 +16,6 @@ from Run import *
 
 def test_semantic():
 	init_system()
-	dssm_model_train('AttentionDSSM')
+	dssm_model_extract_t_pre('AttentionDSSM')
 
 test_semantic()

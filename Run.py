@@ -9,14 +9,17 @@ function: 整个系统流程运行控制模块
 import json
 
 # 引入内部库
-from KnowledgeMatching.SemanticSimMatching import dssm_model_infer
+from DialogueManagement.DM import *
+from KnowledgeMatching.SemanticSimMatching import *
 from UtilArea import GlobalVariable
+
+# 全局变量
 
 
 def init_system ():
 	"""
 	系统的初始化函数
-	:return:
+	:return: NULL
 	"""
 	print('init global variable---------')
 	GlobalVariable._init()
@@ -24,10 +27,11 @@ def init_system ():
 
 def get_answer (queries, model_name='MultiGruModel', top_k=1):
 	"""
-	根据输入的多个问题，获取每个问题对应的前k个答案
+	根据输入的多个问题，到指定模型中获取每个问题对应的前k个答案
 	:param queries: 问题列表
-	:param top_k: 候选答案数
-	:return: 二维数组
+	:param model_name: 调用模型名字
+	:param top_k: 返回的问题数
+	:return: 实际答案和问题二维数组
 	"""
 	print('get answer---------')
 	# 调用模型计算，获取每一个问题对应top-k个答案ID
@@ -53,3 +57,12 @@ def get_answer (queries, model_name='MultiGruModel', top_k=1):
 		answer_set.append(answer_list)
 
 	return query_set, answer_set
+
+
+def run ():
+	init_system()
+
+	# 一个用户维护一个对话管理模块
+	user_id = 0
+	dm = DM(user_id)
+	dm.create_dialog()
