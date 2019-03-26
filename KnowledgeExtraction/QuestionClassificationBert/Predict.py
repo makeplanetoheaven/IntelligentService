@@ -7,24 +7,24 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import json
+import argparse
 import logging
+from collections import OrderedDict
+
+import numpy as np
+import torch
+from pytorch_pretrained_bert.modeling import BertForSequenceClassification
+from pytorch_pretrained_bert.tokenization import BertTokenizer
+from sklearn import metrics
+from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
 
 from KnowledgeExtraction.QuestionClassificationBert.Preprocess import convert_examples_to_features, MyPro
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-import argparse
-from sklearn import metrics
-import numpy as np
-import torch
-from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
-from pytorch_pretrained_bert.tokenization import BertTokenizer
-from pytorch_pretrained_bert.modeling import BertForSequenceClassification
-from pytorch_pretrained_bert.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 
 
-def test(model, processor, args, label_list, tokenizer):
+def test(model, processor, args, label_list, tokenizer, device):
     '''模型测试
 
     Args:
@@ -50,14 +50,14 @@ def test(model, processor, args, label_list, tokenizer):
     test_sampler = SequentialSampler(test_data)
     test_dataloader = DataLoader(test_data, sampler=test_sampler, batch_size=args.eval_batch_size)
 
-    #     model.eval()
+    model.eval()
     predict = np.zeros((0,), dtype=np.int32)
     gt = np.zeros((0,), dtype=np.int32)
     for input_ids, input_mask, segment_ids, label_ids in test_dataloader:
-        input_ids = input_ids
-        input_mask = input_mask
-        segment_ids = segment_ids
-        label_ids = label_ids
+        input_ids = input_ids.to(device)
+        input_mask = input_mask.to(device)
+        segment_ids = segment_ids.to(device)
+        label_ids = label_ids.to(device)
         with torch.no_grad():
             logits = model(input_ids, segment_ids, input_mask)
             pred = logits.max(1)[1]
@@ -71,21 +71,10 @@ def test(model, processor, args, label_list, tokenizer):
     f1 = np.mean(metrics.f1_score(predict, gt, average=None))
     print('F1 score in test set is {}'.format(f1))
     review = processor.get_text_a(args.data_dir)
+    isSaved = processor.write_predict_result(review, predict, gt)
     for i in range(len(predict)):
         if predict[i] == 1 and predict[i] != gt[i]:
             print('predict is: {}'.format(str(predict[i])) + '\n' + 'gt is: {}'.format(str(gt[i])) + '\n' + review[i])
-    try:
-        res = []
-        for index, text in enumerate(review):
-            temp = {'index': index, 'content': text, 'label': str(predict[index])}
-            res.append(temp)
-        #         print(res)
-        with open('predict.json', 'w', encoding='utf-8') as f:
-            json.dump(res, f, ensure_ascii=False, indent=2)
-
-
-    except Exception as e:
-        print(e)
     return f1
 
 
@@ -98,7 +87,7 @@ parser = argparse.ArgumentParser()
 # required parameters
 # 调用add_argument()向ArgumentParser对象添加命令行参数信息，这些信息告诉ArgumentParser对象如何处理命令行参数
 parser.add_argument("--data_dir",
-                    default='QAData/',
+                    default='./KnowledgeMemory/BertDataDir',
                     type=str,
                     # required = True,
                     help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
@@ -113,12 +102,12 @@ parser.add_argument("--task_name",
                     # required = True,
                     help="The name of the task to train.")
 parser.add_argument("--output_dir",
-                    default='checkpoints/',
+                    default='./ModelMemory/QuestionClassificationBert/model/checkpoints',
                     type=str,
                     # required = True,
                     help="The output directory where the model checkpoints will be written")
 parser.add_argument("--model_save_pth",
-                    default='checkpoints/bert_classification.pth',
+                    default='./ModelMemory/QuestionClassificationBert/model/checkpoints/bert_classification.pth',
                     type=str,
                     # required = True,
                     help="The output directory where the model checkpoints will be written")
@@ -191,15 +180,20 @@ parser.add_argument("--loss_scale",
                     help="Loss scaling, positive power of 2 values can improve fp16 convergence.")
 
 #     args = parser.parse_args()
-device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
-
 args, unknown = parser.parse_known_args()
-tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
-model = BertForSequenceClassification.from_pretrained(args.bert_model,
-                                                      cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(
-                                                          args.local_rank))
-# model = torch.nn.DataParallel(model)
-# cudnn.benchmark = True
-model.load_state_dict(torch.load(args.model_save_pth)['state_dict'])
-# print(model)
-test(model, processor, args, label_list, tokenizer)
+device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+print(device)
+
+tokenizer = BertTokenizer.from_pretrained(args.bert_model)
+# model = BertForSequenceClassification.from_pretrained(args.bert_model,cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(args.local_rank))
+model = BertForSequenceClassification.from_pretrained(args.bert_model)
+state_dict = torch.load(args.model_save_pth, map_location='cpu')['state_dict']
+
+new_state_dict = OrderedDict()
+for k, v in state_dict.items():
+    name = k[7:]  # remove module.
+    new_state_dict[name] = v
+model.load_state_dict(new_state_dict)
+
+if __name__ == '__main__':
+    test(model, processor, args, label_list, tokenizer, device)

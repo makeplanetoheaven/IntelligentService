@@ -82,11 +82,11 @@ def main():
     # 1.设置参数
     # ArgumentParser对象保存了所有必要的信息，用以将命令行参数解析为相应的python数据类型
     parser = argparse.ArgumentParser()
+    # GlobalVariable.set_value('BERT_DATA','./KnowledgeMemory/BertDataDir')
 
-    # required parameters
     # 调用add_argument()向ArgumentParser对象添加命令行参数信息，这些信息告诉ArgumentParser对象如何处理命令行参数
     parser.add_argument("--data_dir",
-                        default='QAData/',
+                        default='./KnowledgeMemory/BertDataDir',
                         type=str,
                         # required = True,
                         help="The input data dir. Should contain the .tsv files (or other data files) for the task.")
@@ -101,12 +101,12 @@ def main():
                         # required = True,
                         help="The name of the task to train.")
     parser.add_argument("--output_dir",
-                        default='checkpoints/',
+                        default='./ModelMemory/QuestionClassificationBert/model/checkpoints',
                         type=str,
                         # required = True,
                         help="The output directory where the model checkpoints will be written")
     parser.add_argument("--model_save_pth",
-                        default='checkpoints/bert_classification.pth',
+                        default='./ModelMemory/QuestionClassificationBert/model/checkpoints/bert_classification.pth',
                         type=str,
                         # required = True,
                         help="The output directory where the model checkpoints will be written")
@@ -240,22 +240,23 @@ def main():
         num_train_steps = int(
             len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)
 
-    # Prepare model
+    # 准备模型，使用预训练的bert_base_chinese模型的SequenceClassification用于分类任务
     model = BertForSequenceClassification.from_pretrained(args.bert_model,
                                                           cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(
                                                               args.local_rank))
-
+    # 是否使用16位精度提升速度
     if args.fp16:
         model.half()
-    #     model.to(device)
+        model.to(device)
     if args.local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(model,
                                                           device_ids=[args.local_rank],
                                                           output_device=args.local_rank)
+    #如果 gpu数大于1，可以使用数据分布式计算加速，CPU上没有
     elif n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
-    # Prepare optimizer
+    # 配置优化器，使用BertAdam，根据是GPU运算还是CPU还是16位精度，获取parameter——optimizer(待优化参数列表)
     if args.fp16:
         param_optimizer = [(n, param.clone().detach().to('cpu').float().requires_grad_()) \
                            for n, param in model.named_parameters()]
@@ -277,6 +278,11 @@ def main():
                          warmup=args.warmup_proportion,
                          t_total=t_total)
 
+    # 开始训练
+    # 准备步骤：(1)将examples转为features
+    # (2)将features中的参数加载到torch.tensor中
+    # (3)使用TensorDataset将所有的featuretensor打包作为训练集数据，选择随机采样或分布式采样
+    #(4)使用DataLoader将训练集加载，确定采样方式和batch_size
     global_step = 0
     if args.do_train:
         train_features = convert_examples_to_features(
@@ -296,6 +302,9 @@ def main():
             train_sampler = DistributedSampler(train_data)
         train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
 
+        # 开始训练，计算loss，同样分为GPU/CPU/16位精度分别计算
+        # 每次计算完后反向传播 loss.backward()
+        #
         model.train()
         best_score = 0
         flags = 0
@@ -332,7 +341,8 @@ def main():
                     else:
                         optimizer.step()
                     model.zero_grad()
-
+            # 调用val()在验证集上验证当前模型效果，每次得到更高的f1值，就将模型对应的参数保存，
+            # 并设置如果连续n次f1值都没有提升，认为模型收敛，结束训练
             f1 = val(model, processor, args, label_list, tokenizer, device)
             if f1 > best_score:
                 best_score = f1

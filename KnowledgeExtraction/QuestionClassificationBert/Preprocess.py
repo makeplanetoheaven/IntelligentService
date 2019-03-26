@@ -117,26 +117,40 @@ class MyPro(DataProcessor):
 
     def get_train_examples(self, data_dir):
         return self._create_examples(
-            self._read_json(os.path.join(data_dir, "train.json")), 'train')
+            self._read_json(os.path.join(data_dir, "train.json").replace('\\', '/')), 'train')
 
     def get_dev_examples(self, data_dir):
         return self._create_examples(
-            self._read_json(os.path.join(data_dir, "val.json")), 'dev')
+            self._read_json(os.path.join(data_dir, "val.json").replace('\\', '/')), 'dev')
 
     def get_test_examples(self, data_dir):
         return self._create_examples(
-            self._read_json(os.path.join(data_dir, "test.json")), 'test')
+            self._read_json(os.path.join(data_dir, "test.json").replace('\\', '/')), 'test')
 
     def get_labels(self):
         return [0, 1]
 
     def get_text_a(self, data_dir):
-        dicts = self._read_json(os.path.join(data_dir, "test.json"))
+        dicts = self._read_json(os.path.join(data_dir, "test.json").replace('\\', '/'))
         res = [0] * len(dicts)
         for i, text in enumerate(dicts):
             text = dicts[i]['content']
             res[i] = text
         return res
+
+    def write_predict_result(self, contents, predict_list, gt_list):
+        try:
+            res = []
+            for index, text in enumerate(contents):
+                temp = {'index': index, 'content': text, 'predict_label': str(predict_list[index]),
+                        'gt_label': str(gt_list[index])}
+                res.append(temp)
+            with open('./KnowledgeMemory/predict.json', 'w', encoding='utf-8') as f:
+                json.dump(res, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            print(e)
+            return False
 
     def _create_examples(self, dicts, set_type):
         examples = []
