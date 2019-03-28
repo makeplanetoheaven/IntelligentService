@@ -93,11 +93,12 @@ def dssm_model_infer (queries, model_name='MultiGruModel', top_k=1, query_type=N
 		i += 1
 
 	# 模型计算
-	dssm = dssm_model[model_name](q_set=query_set, t_set=t_set, dict_set=word_dict, vec_set=vec_set, is_train=False, top_k=top_k)
+	dssm = GlobalVariable.get_value('MODEL')['DSSM'][model_name+'_INFER']
+	dssm.q_set = query_set
+	dssm.t_set = t_set
 	dssm.init_model_parameters()
 	dssm.generate_data_set()
-	dssm.build_graph()
-	result_id_list = dssm.inference()
+	result_id_list = dssm.inference(top_k)
 	for i in range(len(result_id_list)):
 		for j in range(len(result_id_list[i])):
 			result_id_list[i][j] = index_set[result_id_list[i][j]]

@@ -29,13 +29,14 @@ class AttentionDSSM:
 	              gamma=20, # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
 	              is_extract = False, # 是否进行t特征提取
-				  top_k=1 # 返回候选问题数目
-	              ):
+				  ):
 		# 外部参数
 		self.q_set = q_set
 		self.t_set = t_set
 		self.dict_set = dict_set
 		self.vec_set = vec_set
+		# 最后一行表示字典中没有词的词向量,正态分布初始化
+		self.vec_set.append(list(np.random.randn(len(self.vec_set[0]))))
 		self.batch_size = batch_size
 		self.hidden_num = hidden_num
 		self.attention_num = attention_num
@@ -44,11 +45,10 @@ class AttentionDSSM:
 		self.gamma = gamma
 		self.is_train = is_train
 		self.is_extract = is_extract
-		self.top_k_answer = top_k
 
 		# 内部参数
 		self.q_size = 0
-		self.t_size = 0
+		self.t_size = 0 # 即可以为常数，也可以为占位符
 		self.negative_sample_num = 0
 		self.q_actual_length = []
 		self.t_actual_length = []
@@ -66,6 +66,7 @@ class AttentionDSSM:
 		self.t_inputs = None
 		self.t_inputs_actual_length = None
 		self.t_final_state = None
+		self.top_k_answer = None
 		self.outputs = None
 		self.accuracy = None
 		self.loss = None
@@ -77,13 +78,14 @@ class AttentionDSSM:
 			# 获取问题数据大小
 			self.q_size = len(self.q_set)
 
-			if self.batch_size is None:
+			if self.batch_size is None and self.is_train:
 				self.batch_size = self.q_size
 
-			self.negative_sample_num = self.q_size // 10
+			self.negative_sample_num = self.batch_size // 10
 
 		# 获取答案数据大小
-		self.t_size = len(self.t_set)
+		if self.is_train:
+			self.t_size = len(self.t_set)
 
 		if not self.is_extract:
 			# 获取q_set实际长度及最大长度
@@ -112,9 +114,6 @@ class AttentionDSSM:
 		pass
 
 	def generate_data_set (self):
-		# 最后一行表示字典中没有词的词向量,正态分布初始化
-		self.vec_set.append(list(np.random.randn(len(self.vec_set[0]))))
-
 		if not self.is_extract:
 			# 将q_set每一个字转换为其在字典中的序号
 			for i in range(len(self.q_set)):
@@ -228,7 +227,7 @@ class AttentionDSSM:
 			with tf.name_scope('placeholder'):
 				# 定义Q输入
 				if not self.is_extract:
-					self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.q_max_length])
+					self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, None])
 					self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
 				# 定义T输入
@@ -256,6 +255,8 @@ class AttentionDSSM:
 					                                                    reuse=True)
 				else:
 					self.t_final_state = tf.placeholder(dtype=tf.float32, shape=[None, self.hidden_num * 2])
+					self.t_size = tf.placeholder(dtype=tf.int32)
+					self.batch_size = tf.placeholder(dtype=tf.int64)
 
 			if not self.is_extract:
 				with tf.name_scope('MatchingLayer'):
@@ -266,7 +267,9 @@ class AttentionDSSM:
 
 				# softmax归一化并输出
 				prob = tf.nn.softmax(cos_sim)
-				_, self.outputs = tf.nn.top_k(prob, self.top_k_answer)
+				if not self.is_train:
+					self.top_k_answer = tf.placeholder(dtype=tf.int32)
+					_, self.outputs = tf.nn.top_k(prob, self.top_k_answer)
 
 				if self.is_train:
 					with tf.name_scope('Loss'):
@@ -326,17 +329,18 @@ class AttentionDSSM:
 
 		pass
 
-	def inference (self):
+	def inference (self, top_k):
 		with tf.Session(graph=self.graph) as self.session:
 			self.saver.restore(self.session, self.model_save_name)
 
 			feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
-			             self.t_final_state:self.t_set}
+			             self.t_final_state: self.t_set, self.t_size: len(self.t_set), self.top_k_answer: top_k,
+			             self.batch_size: len(self.q_set)}
 			results = self.session.run(self.outputs, feed_dict=feed_dict)
 
 			return results
 
-	def extract_t_pre(self):
+	def extract_t_pre (self):
 		with tf.Session(graph=self.graph) as self.session:
 			self.saver.restore(self.session, self.model_save_name)
 
