@@ -89,6 +89,7 @@ class AttentionDSSM:
 
 		if not self.is_extract:
 			# 获取q_set实际长度及最大长度
+			self.q_actual_length = []
 			for data in self.q_set:
 				self.q_actual_length.append(len(data))
 			self.q_max_length = max(self.q_actual_length)

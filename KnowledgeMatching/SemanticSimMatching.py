@@ -82,16 +82,6 @@ def dssm_model_infer (queries, model_name='MultiGruModel', top_k=1, query_type=N
 	for i in range(len(index_set)):
 		t_set.append(t_pre_dict[index_set[i]])
 
-	# 字向量字典获取
-	embedding_dict = GlobalVariable.get_value('Word2Vec_CHARACTER_EMBEDDING')
-	word_dict = {}
-	vec_set = []
-	i = 0
-	for key in embedding_dict:
-		word_dict[key] = i
-		vec_set.append(embedding_dict[key][0])
-		i += 1
-
 	# 模型计算
 	dssm = GlobalVariable.get_value('MODEL')['DSSM'][model_name+'_INFER']
 	dssm.q_set = query_set
