@@ -10,6 +10,7 @@ from transitions import Machine
 
 # 引入内部库
 from KnowledgeMatching.SemanticSimMatching import *
+from UtilArea import GlobalVariable
 
 
 class FAQGuiding:
@@ -55,11 +56,11 @@ class FAQGuiding:
 		faq_dict = GlobalVariable.get_value('FAQ_DATA')
 
 		# 输出指定ID答案
-		print(faq_dict[answer_id_list[0][0]]["答案"])
+		GlobalVariable.get_value('OUTPUT')(faq_dict[answer_id_list[0][0]]["答案"])
 
 		# 是否正确的判断
-		print('是否是正确答案？（是/否）')
-		if input() == '是':
+		GlobalVariable.get_value('OUTPUT')('是否是正确答案？（是/否）')
+		if GlobalVariable.get_value('INPUT')() == '是':
 			self.correct()
 		else:
 			self.error(query, answer_id_list[0][0])
@@ -70,8 +71,8 @@ class FAQGuiding:
 
 		# 问题类型判断
 		query_type = faq_dict[answer_id]["专业"]
-		print('您想询问的是否是[%s]相关问题？（是/否）' % query_type)
-		if input() == '是':
+		GlobalVariable.get_value('OUTPUT')('您想询问的是否是[%s]相关问题？（是/否）' % query_type)
+		if GlobalVariable.get_value('INPUT')() == '是':
 			self.correct(query, query_type)
 		else:
 			self.error(query)
@@ -87,13 +88,13 @@ class FAQGuiding:
 
 		# 输出指定ID问题
 		for index in range(len(answer_id_list[0])):
-			print(str(index+1)+'.'+faq_dict[answer_id_list[0][index]]["问题"])
+			GlobalVariable.get_value('OUTPUT')(str(index+1)+'.'+faq_dict[answer_id_list[0][index]]["问题"])
 
 		# 候选问题选择
-		print('上述问题是否包含您想问的问题，如果是，请返回相应问题序号，如果不是，请回[否]')
-		respond = input()
+		GlobalVariable.get_value('OUTPUT')('上述问题是否包含您想问的问题，如果是，请返回相应问题序号，如果不是，请回[否]')
+		respond = GlobalVariable.get_value('INPUT')()
 		if respond.isdigit():
-			print(faq_dict[answer_id_list[0][int(respond)-1]]["答案"])
+			GlobalVariable.get_value('OUTPUT')(faq_dict[answer_id_list[0][int(respond)-1]]["答案"])
 			self.selecting()
 		else:
 			self.error(query)
@@ -107,13 +108,13 @@ class FAQGuiding:
 				query_types.append(faq_dict['专业'])
 
 		# 输出问题类型
-		print('目前已有的问题类型有：')
+		GlobalVariable.get_value('OUTPUT')('目前已有的问题类型有：')
 		for index in range(len(query_types)):
-			print(str(index+1)+'.'+query_types[index])
+			GlobalVariable.get_value('OUTPUT')(str(index+1)+'.'+query_types[index])
 
 		# 问题类型选择
-		print('上述类型是否包含您想问的问题类型，如果是，请返回相应类型序号，如果不是，请回[否]')
-		respond = input()
+		GlobalVariable.get_value('OUTPUT')('上述类型是否包含您想问的问题类型，如果是，请返回相应类型序号，如果不是，请回[否]')
+		respond = GlobalVariable.get_value('INPUT')()
 		if respond.isdigit():
 			query_type = query_types[int(respond) - 1]
 			self.selecting(query, query_type)
@@ -121,4 +122,4 @@ class FAQGuiding:
 			self.error(query)
 
 	def end_process (self):
-		print('感谢为您解答！')
+		GlobalVariable.get_value('OUTPUT')('感谢为您解答！')
