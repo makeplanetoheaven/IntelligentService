@@ -11,6 +11,7 @@ function: 对话管理模块的主类，作为对话管理模块的接口
 # 引入内部库
 from DialogueManagement.DST import *
 from DialogueManagement.DialogPolicy.FSM import *
+from UtilArea import GlobalVariable
 
 
 class DM:
@@ -26,8 +27,8 @@ class DM:
 
 	def create_dialog (self):
 		# 问题输入
-		print("您好，有什么能帮助您的？")
-		init_sentence = input()
+		GlobalVariable.get_value('OUTPUT')("您好，有什么能帮助您的？")
+		init_sentence = GlobalVariable.get_value('INPUT')()
 
 		# 新增一个对话场景，并将初始句加入相应对话场景中
 		self.dialog_tree.add_dialog_branch(init_sentence, 'FAQ')

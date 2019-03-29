@@ -2,11 +2,10 @@
 
 """
 author: 王黎成
-function: 整个系统流程运行控制模块
+function: 整个系统流程运行控制模块,系统唯一的对外接口
 """
 
 # 引入外部库
-import json
 
 # 引入内部库
 from DialogueManagement.DM import *
@@ -18,7 +17,7 @@ from UtilArea import GlobalVariable
 
 def init_system ():
 	"""
-	系统的初始化函数
+	系统的初始化函数, 第一个需要运行的函数
 	:return: NULL
 	"""
 	print('init global variable---------')
@@ -27,7 +26,7 @@ def init_system ():
 
 def get_answer (queries, model_name='MultiGruModel', top_k=1):
 	"""
-	根据输入的多个问题，到指定模型中获取每个问题对应的前k个答案
+	不包含多轮对话，根据输入的多个问题，到指定模型中获取每个问题对应的前k个答案
 	:param queries: 问题列表
 	:param model_name: 调用模型名字
 	:param top_k: 返回的问题数
@@ -60,9 +59,29 @@ def get_answer (queries, model_name='MultiGruModel', top_k=1):
 
 
 def run ():
-	init_system()
-
+	"""
+	整个系统运行控制函数
+	:return:
+	"""
 	# 一个用户维护一个对话管理模块
 	user_id = 0
 	dm = DM(user_id)
 	dm.create_dialog()
+
+
+def set_input_interface(func):
+	"""
+	修改输入接口的函数
+	:param func: 函数无形参，有返回值
+	:return:
+	"""
+	GlobalVariable.set_value('INPUT', func)
+
+
+def set_output_interface(func):
+	"""
+	修改输出接口的函数
+	:param func: 函数有形参，无返回值
+	:return:
+	"""
+	GlobalVariable.set_value('OUPUT', func)

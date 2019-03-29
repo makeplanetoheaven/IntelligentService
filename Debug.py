@@ -27,6 +27,7 @@ def test_get_answer ():
 
 
 def test_run ():
+	init_system()
 	run()
 
 
