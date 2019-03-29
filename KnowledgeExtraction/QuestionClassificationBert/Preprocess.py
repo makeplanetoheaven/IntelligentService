@@ -93,6 +93,9 @@ class DataProcessor(object):
         """Gets a collection of `InputExample`s for the test set."""
         raise NotImplementedError()
 
+    def get_sentences_examples(self, sentence):
+        raise NotImplementedError()
+
     def get_labels(self):
         """Gets the list of labels for this data set."""
         raise NotImplementedError()
@@ -106,6 +109,17 @@ class DataProcessor(object):
                 inf = inf.strip()
                 dicts.append(json.loads(inf))
         return dicts
+
+    @classmethod
+    def _read_list(cls, input_list):
+        res = []
+        temp = ''
+        for i in input_list:
+            temp += i
+        res.append(temp)
+        return res
+
+
 
 
 class MyPro(DataProcessor):
@@ -159,6 +173,25 @@ class MyPro(DataProcessor):
             text_a = infor['content']
             #             print('--------------------------------------\n'+ text_a)
             label = infor['label']
+            examples.append(InputExample(guid=guid, text_a=text_a, label=label))
+
+        return examples
+
+
+class sentencePro(DataProcessor):
+
+    def get_sentences_examples(self, sentence_list):
+        return self._create_sentences_examples(self._read_list(sentence_list), 'test')
+
+    def get_labels(self):
+        return [0, 1]
+
+    def _create_sentences_examples(self, sentences_list, set_type):
+        examples = []
+        for (i, infor) in enumerate(sentences_list):
+            guid = "%s-%s" % (set_type, i)
+            text_a = infor
+            label = 0
             examples.append(InputExample(guid=guid, text_a=text_a, label=label))
 
         return examples
