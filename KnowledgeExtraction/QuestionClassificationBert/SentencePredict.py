@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def test(model, processor, args, label_list, tokenizer, device):
+def test(model, processor, args, label_list, tokenizer, device, input):
     '''模型测试
 
     Args:
@@ -35,7 +35,7 @@ def test(model, processor, args, label_list, tokenizer, device):
         f1: F1值
     '''
     # test_examples = processor.get_test_examples(args.data_dir)
-    test_examples = processor.get_sentences_examples(input())
+    test_examples = processor.get_sentences_examples(input)
     test_features = convert_examples_to_features(
         test_examples, label_list, args.get('max_seq_length'), tokenizer)
     all_input_ids = torch.tensor([f.input_ids for f in test_features], dtype=torch.long)
