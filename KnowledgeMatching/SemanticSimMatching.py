@@ -124,6 +124,6 @@ def dssm_model_extract_t_pre(model_name='MultiGruModel'):
 	t_pre_dict = {}
 	for i in range(len(t_state)):
 		t_pre_dict[i] = list(map(float, list(t_state[i])))
-	print(t_pre_dict)
+
 	with open(GlobalVariable.get_value('DSSM_FAQ_EMBEDDING_PATH')[model_name], 'w', encoding='utf-8') as file_object:
 		json.dump(t_pre_dict, file_object, ensure_ascii=False, indent=2)

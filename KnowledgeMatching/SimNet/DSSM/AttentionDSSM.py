@@ -142,10 +142,10 @@ class AttentionDSSM:
 			with tf.name_scope('structure_presentation'):
 				# 正向
 				fw_cell = GRUCell(num_units=self.hidden_num)
-				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.5)
+				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.1)
 				# 反向
 				bw_cell = GRUCell(num_units=self.hidden_num)
-				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.5)
+				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.1)
 
 				# 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出是一个元组 每一个元素也是这种形状
 				if self.is_train:
@@ -304,7 +304,7 @@ class AttentionDSSM:
 				self.saver.restore(self.session, self.model_save_name)
 			else:
 				# 初始化变量
-				tf.initialize_all_variables().run()
+				self.session.run(tf.global_variables_initializer())
 
 			# 开始迭代，使用Adam优化的随机梯度下降法，并将结果输出到日志文件
 			print('training------')

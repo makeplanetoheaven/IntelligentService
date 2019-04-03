@@ -12,10 +12,12 @@ import json
 # 引入内部库
 from KnowledgeMatching.SemanticSimMatching import *
 from Run import *
+from UtilArea.Csv2Json import *
 
 
 def test_semantic():
 	init_system()
 	dssm_model_extract_t_pre('AttentionDSSM')
+
 
 test_semantic()
