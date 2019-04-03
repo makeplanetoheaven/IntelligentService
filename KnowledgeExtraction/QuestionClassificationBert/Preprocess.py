@@ -123,11 +123,11 @@ class DataProcessor(object):
 
 
 class MyPro(DataProcessor):
-    '''自定义数据读取方法，针对json文件
+    """自定义数据读取方法，针对json文件
 
     Returns:
         examples: 数据集，包含index、中文文本、类别三个部分
-    '''
+    """
 
     def get_train_examples(self, data_dir):
         return self._create_examples(
