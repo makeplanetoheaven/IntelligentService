@@ -25,7 +25,6 @@ def test_get_answer ():
 			print('实际问题' + str(j) + ':' + real_query_list[i][j])
 			print('答案' + str(j) + ':' + answer_list[i][j])
 		print('--------------------------------')
-	print('totally cost', time_end - time_start)
 
 
 def test_run ():
