@@ -44,7 +44,6 @@ class Csv2Json():
                 row_dict = {}
                 row_dict["index"] = i
                 for key in key_list:
-                    print(df[key][i])
                     row_dict[key] = df[key][i].replace('\n', "").replace(' ', "")
                 temp_dict.append(row_dict)
             json.dump(temp_dict, file_object, ensure_ascii=False, indent=2)

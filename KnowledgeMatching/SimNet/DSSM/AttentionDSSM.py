@@ -67,7 +67,8 @@ class AttentionDSSM:
 		self.t_inputs_actual_length = None
 		self.t_final_state = None
 		self.top_k_answer = None
-		self.outputs = None
+		self.outputs_prob = None
+		self.outputs_index = None
 		self.accuracy = None
 		self.loss = None
 		self.train_op = None
@@ -270,7 +271,7 @@ class AttentionDSSM:
 				prob = tf.nn.softmax(cos_sim)
 				if not self.is_train:
 					self.top_k_answer = tf.placeholder(dtype=tf.int32)
-					_, self.outputs = tf.nn.top_k(prob, self.top_k_answer)
+					self.outputs_prob, self.outputs_index = tf.nn.top_k(prob, self.top_k_answer)
 
 				if self.is_train:
 					with tf.name_scope('Loss'):
@@ -330,16 +331,17 @@ class AttentionDSSM:
 
 		pass
 
+	def start_session(self):
+		self.session = tf.Session(graph=self.graph)
+		self.saver.restore(self.session, self.model_save_name)
+
 	def inference (self, top_k):
-		with tf.Session(graph=self.graph) as self.session:
-			self.saver.restore(self.session, self.model_save_name)
+		feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
+		             self.t_final_state: self.t_set, self.t_size: len(self.t_set), self.top_k_answer: top_k,
+		             self.batch_size: len(self.q_set)}
+		prob, index = self.session.run([self.outputs_prob, self.outputs_index], feed_dict=feed_dict)
 
-			feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
-			             self.t_final_state: self.t_set, self.t_size: len(self.t_set), self.top_k_answer: top_k,
-			             self.batch_size: len(self.q_set)}
-			results = self.session.run(self.outputs, feed_dict=feed_dict)
-
-			return results
+		return prob, index
 
 	def extract_t_pre (self):
 		with tf.Session(graph=self.graph) as self.session:

@@ -12,6 +12,7 @@ from DialogueManagement.DM import *
 from KnowledgeMatching.SemanticSimMatching import *
 from UtilArea import GlobalVariable
 
+
 # 全局变量
 
 
@@ -24,17 +25,18 @@ def init_system ():
 	GlobalVariable._init()
 
 
-def get_answer (queries, model_name='MultiGruModel', top_k=1):
+def get_answer (queries, model_name='MultiGruModel', top_k=1, threshold=0.):
 	"""
 	不包含多轮对话，根据输入的多个问题，到指定模型中获取每个问题对应的前k个答案
 	:param queries: 问题列表
 	:param model_name: 调用模型名字
 	:param top_k: 返回的问题数
+	:param threshold: 相似度阈值
 	:return: 实际答案和问题二维数组
 	"""
 	print('get answer---------')
 	# 调用模型计算，获取每一个问题对应top-k个答案ID
-	answer_id_list = dssm_model_infer(queries, model_name=model_name, top_k=top_k)
+	answer_id_list = dssm_model_infer(queries, model_name=model_name, top_k=top_k, threshold=threshold)
 
 	# 数据加载
 	faq_dict = GlobalVariable.get_value('FAQ_DATA')
@@ -69,7 +71,7 @@ def run ():
 	dm.create_dialog()
 
 
-def set_input_interface(func):
+def set_input_interface (func):
 	"""
 	修改输入接口的函数
 	:param func: 函数无形参，有返回值
@@ -78,7 +80,7 @@ def set_input_interface(func):
 	GlobalVariable.set_value('INPUT', func)
 
 
-def set_output_interface(func):
+def set_output_interface (func):
 	"""
 	修改输出接口的函数
 	:param func: 函数有形参，无返回值
