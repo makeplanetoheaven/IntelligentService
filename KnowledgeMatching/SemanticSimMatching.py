@@ -11,10 +11,11 @@ import json
 # 引入内部库
 from KnowledgeMatching.SimNet.DSSM.MultiGruDSSM import *
 from KnowledgeMatching.SimNet.DSSM.AttentionDSSM import *
+from KnowledgeMatching.SimNet.DSSM.TransformerDSSM import *
 from UtilArea import GlobalVariable
 
 # 全局变量
-dssm_model = {'MultiGruModel': MultiGruDSSM, 'AttentionDSSM': AttentionDSSM}
+dssm_model = {'MultiGruModel': MultiGruDSSM, 'AttentionDSSM': AttentionDSSM, 'TransformerDSSM':TransformerDSSM}
 
 
 def dssm_model_train (model_name='MultiGruModel'):

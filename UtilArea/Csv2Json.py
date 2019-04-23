@@ -40,6 +40,7 @@ class Csv2Json():
             for key in df:
                 key_list.append(key)
             key_list.pop(0)
+
             for i in range(len(df[key_list[0]])):
                 row_dict = {}
                 row_dict["index"] = i

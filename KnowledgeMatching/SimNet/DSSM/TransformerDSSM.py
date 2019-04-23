@@ -16,13 +16,13 @@ from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
 # 引入内部库
 
 
-class AttentionDSSM:
+class TransformerDSSM:
 	def __init__ (self, q_set=None,  # 问题集,二维数组
 	              t_set=None,  # 答案集,二维数组
 	              dict_set=None, # 字典集，[词：index]
 	              vec_set=None,  # 向量集，[向量]，与dict_set顺序一致
 	              batch_size=None, # 训练批次，默认是全部数据
-	              hidden_num=768,  # 隐藏层个数
+	              hidden_num=150,  # 隐藏层个数
 	              attention_num = 512, # 注意力机制的数目
 	              learning_rate=0.01,  # 学习率
 	              epoch_steps=200,  # 训练迭代次数
@@ -72,6 +72,9 @@ class AttentionDSSM:
 		self.accuracy = None
 		self.loss = None
 		self.train_op = None
+
+		# 归一化层构建
+		self.layer_normalization = LayerNormalization(self.hidden_num * 2)
 
 	def init_model_parameters (self):
 		print('Initializing------')
@@ -138,15 +141,15 @@ class AttentionDSSM:
 
 		pass
 
-	def presentation_bi_attention (self, inputs, inputs_actual_length, reuse=None):
+	def presentation_transformer (self, inputs, inputs_actual_length, reuse=None):
 		with tf.variable_scope('presentation_layer', reuse=reuse):
-			with tf.name_scope('structure_presentation'):
+			with tf.name_scope('structure_presentation_layer'):
 				# 正向
 				fw_cell = GRUCell(num_units=self.hidden_num)
-				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.8)
+				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.5)
 				# 反向
 				bw_cell = GRUCell(num_units=self.hidden_num)
-				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.8)
+				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.5)
 
 				# 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出是一个元组 每一个元素也是这种形状
 				if self.is_train and not self.is_extract:
@@ -160,21 +163,60 @@ class AttentionDSSM:
 				# hiddens的长度为2，其中每一个元素代表一个方向的隐藏状态序列，将每一时刻的输出合并成一个输出
 				structure_output = tf.concat(output, axis=2)
 
-			with tf.name_scope('semantic_presentation'):
+				# skip-connect + LN
+				structure_output += inputs
+				structure_output = self.layer_normalization(structure_output)
+
+			with tf.name_scope('self_attention_layer'):
+				# q, k, v define
+				q_dense_layer = tf.layers.Dense(self.hidden_num * 2, use_bias=False, name="q")
+				k_dense_layer = tf.layers.Dense(self.hidden_num * 2, use_bias=False, name="k")
+				v_dense_layer = tf.layers.Dense(self.hidden_num * 2, use_bias=False, name="v")
+
+				q = q_dense_layer(structure_output) * (self.hidden_num ** -0.5)
+				k = k_dense_layer(structure_output)
+				v = v_dense_layer(structure_output)
+
+				# calculate
+				logits = tf.matmul(q, k, transpose_b=True)
+				weights = tf.nn.softmax(logits, name="attention_weights")
+				if self.is_train and not self.is_extract:
+					weights = tf.nn.dropout(weights, 0.5)
+				self_attention_output = tf.matmul(weights, v)
+
+				# skip-connect + LN
+				self_attention_output += structure_output
+				self_attention_output = self.layer_normalization(self_attention_output)
+
+			with tf.name_scope('full_connect_layer'):
+				filter_dense_layer = tf.layers.Dense(self.hidden_num * 2, use_bias=True, activation=tf.nn.relu,
+					name="filter_layer")
+				output_dense_layer = tf.layers.Dense(self.hidden_num * 2, use_bias=True, name="output_layer")
+
+				# calculate
+				full_connect_output = filter_dense_layer(self_attention_output)
+				if self.is_train and not self.is_extract:
+					full_connect_output = tf.nn.dropout(full_connect_output, 0.5)
+				full_connect_output = output_dense_layer(full_connect_output)
+
+				# skip-connect + LN
+				full_connect_output += self_attention_output
+				full_connect_output = self.layer_normalization(full_connect_output)
+
+			with tf.name_scope('global_attention_layer'):
 				w_omega = tf.Variable(tf.random_normal([self.hidden_num * 2, self.attention_num], stddev=0.1))
 				b_omega = tf.Variable(tf.random_normal([self.attention_num], stddev=0.1))
 				u_omega = tf.Variable(tf.random_normal([self.attention_num], stddev=0.1))
 
-				v = tf.tanh(tf.tensordot(structure_output, w_omega, axes=1) + b_omega)
+				v = tf.tanh(tf.tensordot(full_connect_output, w_omega, axes=1) + b_omega)
 
 				vu = tf.tensordot(v, u_omega, axes=1, name='vu')  # (B,T) shape
 				alphas = tf.nn.softmax(vu, name='alphas')  # (B,T) shape
 
-				# Output of (Bi-)RNN is reduced with attention vector; the result has (B,D) shape
 				# tf.expand_dims用于在指定维度增加一维
-				attention_output = tf.reduce_sum(structure_output * tf.expand_dims(alphas, -1), 1)
+				global_attention_output = tf.reduce_sum(structure_output * tf.expand_dims(alphas, -1), 1)
 
-		return attention_output
+		return global_attention_output
 
 	def matching_layer_training (self, q_final_state, t_final_state):
 		with tf.name_scope('TrainProgress'):
@@ -245,11 +287,11 @@ class AttentionDSSM:
 
 			with tf.name_scope('PresentationLayer'):
 				if not self.is_extract:
-					q_final_state = self.presentation_bi_attention(q_embeddings, self.q_inputs_actual_length)
+					q_final_state = self.presentation_transformer(q_embeddings, self.q_inputs_actual_length)
 				if self.is_train and self.is_extract:
-					self.t_final_state = self.presentation_bi_attention(t_embeddings, self.t_inputs_actual_length)
+					self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length)
 				elif self.is_train:
-					self.t_final_state = self.presentation_bi_attention(t_embeddings, self.t_inputs_actual_length,
+					self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length,
 					                                                    reuse=True)
 				else:
 					self.t_final_state = tf.placeholder(dtype=tf.float32, shape=[None, self.hidden_num * 2])
@@ -347,3 +389,20 @@ class AttentionDSSM:
 			t_state = self.session.run(self.t_final_state, feed_dict=feed_dict)
 
 			return t_state
+
+
+class LayerNormalization(tf.layers.Layer):
+	def __init__ (self, hidden_size):
+		super(LayerNormalization, self).__init__()
+		self.hidden_size = hidden_size
+
+	def build (self, _):
+		self.scale = tf.get_variable("layer_norm_scale", [self.hidden_size], initializer=tf.ones_initializer())
+		self.bias = tf.get_variable("layer_norm_bias", [self.hidden_size], initializer=tf.zeros_initializer())
+		self.built = True
+
+	def call (self, x, epsilon=1e-6):
+		mean = tf.reduce_mean(x, axis=[-1], keepdims=True)
+		variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keepdims=True)
+		norm_x = (x - mean) * tf.rsqrt(variance + epsilon)
+		return norm_x * self.scale + self.bias
