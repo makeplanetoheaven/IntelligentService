@@ -20,7 +20,7 @@ def test_get_answer ():
 	init_system()
 	user_query_list = [input()]
 	start = time.time()
-	real_query_list, answer_list = get_answer(user_query_list, model_name='AttentionDSSM', top_k=5, threshold=0.)
+	real_query_list, answer_list = get_answer(user_query_list, model_name='TransformerDSSM', top_k=5, threshold=0.)
 	for i in range(len(user_query_list)):
 		print('用户问题:' + user_query_list[i])
 		for j in range(len(answer_list[i])):

@@ -134,6 +134,6 @@ def dssm_model_extract_t_pre (model_name='MultiGruModel'):
 		for i in range(len(t_state)):
 			t_pre_dict[i] = list(map(float, list(t_state[i])))
 
-		with open('./KnowledgeMemory/Embedding/DSSM/AttentionDSSM/' + key + 'Embedding.json', 'w',
+		with open('./KnowledgeMemory/Embedding/DSSM/+'+model_name+'/' + key + 'Embedding.json', 'w',
 		          encoding='utf-8') as file_object:
 			json.dump(t_pre_dict, file_object, ensure_ascii=False, indent=2)
