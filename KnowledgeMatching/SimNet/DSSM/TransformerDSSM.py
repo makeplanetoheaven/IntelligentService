@@ -2,7 +2,7 @@
 
 """
 author: 王黎成
-function: 通过使用双向GRU+Attention作为表示层进行语义相似度计算
+function: 通过使用双向GRU+Transformer作为表示层进行语义相似度计算
 """
 
 # 引入外部库
@@ -54,8 +54,8 @@ class TransformerDSSM:
 		self.t_actual_length = []
 		self.q_max_length = 0
 		self.t_max_length = 0
-		self.model_save_name = './ModelMemory/SimNet/DSSM/AttentionDSSM/model/attentionDSSM'
-		self.model_save_checkpoint = './ModelMemory/SimNet/DSSM/AttentionDSSM/model/checkpoint'
+		self.model_save_name = './ModelMemory/SimNet/DSSM/TransformerDSSM/model/transformerDSSM'
+		self.model_save_checkpoint = './ModelMemory/SimNet/DSSM/TransformerDSSM/model/checkpoint'
 
 		# 模型参数
 		self.graph = None
