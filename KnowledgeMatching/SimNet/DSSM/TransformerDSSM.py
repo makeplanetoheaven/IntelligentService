@@ -24,8 +24,8 @@ class TransformerDSSM:
 	              batch_size=None, # 训练批次，默认是全部数据
 	              hidden_num=150,  # 隐藏层个数
 	              attention_num = 512, # 注意力机制的数目
-	              learning_rate=0.01,  # 学习率
-	              epoch_steps=200,  # 训练迭代次数
+	              learning_rate=0.0001,  # 学习率
+	              epoch_steps=10,  # 训练迭代次数
 	              gamma=20, # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
 	              is_extract = False, # 是否进行t特征提取
