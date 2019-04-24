@@ -50,7 +50,7 @@ class FAQGuiding:
 		user_query_list = [query]
 
 		# 调用模型计算，获取问题对应答案ID
-		answer_id_list = dssm_model_infer(user_query_list, model_name='AttentionDSSM', top_k=1)
+		answer_id_list = dssm_model_infer(user_query_list, model_name='TransformerDSSM', top_k=1)
 
 		# 数据加载
 		faq_dict = GlobalVariable.get_value('FAQ_DATA')
@@ -81,7 +81,7 @@ class FAQGuiding:
 		user_query_list = [query]
 
 		# 调用模型计算，获取指定类型下，问题对应候选5个答案ID
-		answer_id_list = dssm_model_infer(user_query_list, model_name='AttentionDSSM', top_k=5, query_type=query_type)
+		answer_id_list = dssm_model_infer(user_query_list, model_name='TransformerDSSM', top_k=5, query_type=query_type)
 
 		# 数据加载
 		faq_dict = GlobalVariable.get_value('FAQ_DATA')

@@ -3,6 +3,7 @@
 # @Function :将原始的csv文件转为json文件存储，用作输入
 
 import json
+import os
 
 import pandas as pd
 
@@ -31,14 +32,15 @@ class Csv2Json():
         except (Exception) as e:
             print(e)
 
-    def csv_to_json(self, csv_file_path, json_file_path):
-        df = pd.read_csv(csv_file_path)
-        with open(json_file_path, 'w', encoding='utf-8') as file_object:
+    def csv_to_json(self):
+        df = pd.read_csv(self.read_path, engine='python', encoding='utf-8')
+        with open(self.write_path, 'w', encoding='utf-8') as file_object:
             temp_dict = []
             key_list = []
             for key in df:
                 key_list.append(key)
             key_list.pop(0)
+
             for i in range(len(df[key_list[0]])):
                 row_dict = {}
                 row_dict["index"] = i

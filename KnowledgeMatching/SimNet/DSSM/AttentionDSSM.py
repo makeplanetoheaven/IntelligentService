@@ -67,7 +67,8 @@ class AttentionDSSM:
 		self.t_inputs_actual_length = None
 		self.t_final_state = None
 		self.top_k_answer = None
-		self.outputs = None
+		self.outputs_prob = None
+		self.outputs_index = None
 		self.accuracy = None
 		self.loss = None
 		self.train_op = None
@@ -142,13 +143,13 @@ class AttentionDSSM:
 			with tf.name_scope('structure_presentation'):
 				# 正向
 				fw_cell = GRUCell(num_units=self.hidden_num)
-				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.5)
+				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.8)
 				# 反向
 				bw_cell = GRUCell(num_units=self.hidden_num)
-				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.5)
+				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.8)
 
 				# 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出是一个元组 每一个元素也是这种形状
-				if self.is_train:
+				if self.is_train and not self.is_extract:
 					output, _ = tf.nn.bidirectional_dynamic_rnn(cell_fw=fw_drop_cell, cell_bw=bw_drop_cell,
 					                                            inputs=inputs, sequence_length=inputs_actual_length,
 					                                            dtype=tf.float32)
@@ -191,7 +192,7 @@ class AttentionDSSM:
 			t_norm = tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True))
 			norm_prod = tf.multiply(q_norm, t_norm)
 
-			# qT * d
+			# q * tT
 			prod = tf.reduce_sum(tf.multiply(tf.tile(q_final_state, [self.negative_sample_num + 1, 1]), t_final_state),
 			                     1, True)
 
@@ -205,16 +206,12 @@ class AttentionDSSM:
 	def matching_layer_infer (self, q_final_state, t_final_state):
 		with tf.name_scope('InferProgress'):
 			# ||q|| * ||t||
-			q_norm = tf.tile(tf.transpose(tf.sqrt(tf.reduce_sum(tf.square(q_final_state), 1, True))), [self.t_size, 1])
-			t_norm = tf.tile(tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True)), [1, self.batch_size])
-			norm_prod = tf.transpose(tf.multiply(q_norm, t_norm))
+			q_sqrt = tf.sqrt(tf.reduce_sum(tf.square(q_final_state), 1, True))
+			t_sqrt = tf.sqrt(tf.reduce_sum(tf.square(t_final_state), 1, True))
+			norm_prod = tf.matmul(q_sqrt, t_sqrt, transpose_b=True)
 
-			# qT * d
-			prod = tf.reshape(tf.transpose(tf.reduce_sum(tf.multiply(
-				tf.tile(tf.transpose(tf.reshape(q_final_state, [-1, self.hidden_num*2, 1]), [2, 1, 0]),
-				        [self.t_size, 1, 1]),
-				tf.tile(tf.reshape(t_final_state, [-1, self.hidden_num*2, 1]), [1, 1, self.batch_size])), 1, True),
-				[2, 0, 1]), [self.batch_size, self.t_size])
+			# q * tT
+			prod = tf.matmul(q_final_state, t_final_state, transpose_b=True)
 
 			# cosine
 			cos_sim = tf.truediv(prod, norm_prod) * self.gamma
@@ -270,7 +267,7 @@ class AttentionDSSM:
 				prob = tf.nn.softmax(cos_sim)
 				if not self.is_train:
 					self.top_k_answer = tf.placeholder(dtype=tf.int32)
-					_, self.outputs = tf.nn.top_k(prob, self.top_k_answer)
+					self.outputs_prob, self.outputs_index = tf.nn.top_k(prob, self.top_k_answer)
 
 				if self.is_train:
 					with tf.name_scope('Loss'):
@@ -304,7 +301,7 @@ class AttentionDSSM:
 				self.saver.restore(self.session, self.model_save_name)
 			else:
 				# 初始化变量
-				tf.initialize_all_variables().run()
+				self.session.run(tf.global_variables_initializer())
 
 			# 开始迭代，使用Adam优化的随机梯度下降法，并将结果输出到日志文件
 			print('training------')
@@ -330,16 +327,17 @@ class AttentionDSSM:
 
 		pass
 
+	def start_session(self):
+		self.session = tf.Session(graph=self.graph)
+		self.saver.restore(self.session, self.model_save_name)
+
 	def inference (self, top_k):
-		with tf.Session(graph=self.graph) as self.session:
-			self.saver.restore(self.session, self.model_save_name)
+		feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
+		             self.t_final_state: self.t_set, self.t_size: len(self.t_set), self.top_k_answer: top_k,
+		             self.batch_size: len(self.q_set)}
+		prob, index = self.session.run([self.outputs_prob, self.outputs_index], feed_dict=feed_dict)
 
-			feed_dict = {self.q_inputs: self.q_set, self.q_inputs_actual_length: self.q_actual_length,
-			             self.t_final_state: self.t_set, self.t_size: len(self.t_set), self.top_k_answer: top_k,
-			             self.batch_size: len(self.q_set)}
-			results = self.session.run(self.outputs, feed_dict=feed_dict)
-
-			return results
+		return prob, index
 
 	def extract_t_pre (self):
 		with tf.Session(graph=self.graph) as self.session:
