@@ -2,6 +2,7 @@
 # @Author  : Lone Ranger
 # @Function :
 
+#  引入外部库
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -11,12 +12,14 @@ import json
 import logging
 import os
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import numpy as np
 import pandas as pd
 import torch
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 
 
 def reverse(dataframe):
@@ -52,15 +55,12 @@ class InputExample(object):
     """A single training/test example for simple sequence classification."""
 
     def __init__(self, guid, text_a, text_b=None, label=None):
-        """Constructs a InputExample.
+        """生成一个InputExample.
         Args:
-            guid: Unique id for the example.
-            text_a: string. The untokenized text of the first sequence. For single
-            sequence tasks, only this sequence must be specified.
-            text_b: (Optional) string. The untokenized text of the second sequence.
-            Only must be specified for sequence pair tasks.
-            label: (Optional) string. The label of the example. This should be
-            specified for train and dev examples, but not for test examples.
+            guid: 每个example的独有id.
+            text_a: 字符串，也就是输入的未分割的句子A，对于单句分类任务来说，text_a是必须有的
+            text_b: 可选的输入字符串，单句分类任务不需要这一项，在预测下一句或者阅读理解任务中需要输入text_b，text_a和text_b中间使用[SEP]分隔
+            label: 也是可选的字符串，就是对应的文本或句子的标签，在训练和验证的时候需要指定，但是在测试的时候可以不选
         """
         self.guid = guid
         self.text_a = text_a
@@ -69,7 +69,14 @@ class InputExample(object):
 
 
 class InputFeatures(object):
-    """A single set of features of data."""
+    """A single set of features of data.
+    Args：
+        input_ids:  token的id，在chinese模式中就是每个分词的id，对应一个word vector,就是之前提到的混合embedding
+        input_mask:  真实字符对应1，补全字符对应0，在padding的时候可能会补0，需要记录一下真实的输入字符，模型的attention机制只关注这些字符
+        segment_ids:  句子标识符，第一句全为0，第二句全为1，主要是用于区分单句任务或者是句子对任务，
+                    但其实我们通过使用[SEP]已经起到了区分作用，这里主要还是为了便于模型识别计算
+        label_id: 将Label_list转化为相应的id表示，这里的Label_list可以是数字，可以是字符串，这里统一转换成label_id便于后续加载到tensor中
+    """
 
     def __init__(self, input_ids, input_mask, segment_ids, label_id):
         self.input_ids = input_ids
@@ -171,7 +178,6 @@ class MyPro(DataProcessor):
         for (i, infor) in enumerate(dicts):
             guid = "%s-%s" % (set_type, i)
             text_a = infor['content']
-            #             print('--------------------------------------\n'+ text_a)
             label = infor['label']
             examples.append(InputExample(guid=guid, text_a=text_a, label=label))
 

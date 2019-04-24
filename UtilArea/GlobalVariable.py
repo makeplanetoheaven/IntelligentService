@@ -9,10 +9,12 @@ function: 全局变量使用模块
 import json
 
 # 引入内部库
+from KnowledgeExtraction.QuestionClassificationBert import SentencePredict
+from KnowledgeExtraction.QuestionClassificationBert.Args import BertArgs
 from KnowledgeMatching.SimNet.DSSM.AttentionDSSM import *
-
-
 # 全局变量
+from UtilArea.ClassificationModelParameters import load_parameters_to_cpu
+
 __global_dict = None
 
 
@@ -37,6 +39,10 @@ def _init ():
 	__global_dict['BERT_CHARACTER_EMBEDDING_PATH'] = './KnowledgeMemory/Embedding/BERT/CharactersEmbedding.json'
 	# </editor-fold>
 	# <editor-fold desc="Data">
+	print('loading BERT_ARGS')
+	bert_args = BertArgs(task_name='SentencePro')
+	__global_dict['BERT_ARGS'] = bert_args.set_args()
+	
 	print('loading Data FAQ_DATA')
 	with open('./KnowledgeMemory/FAQ/FAQ.json', 'r', encoding='utf-8') as file_object:
 		__global_dict['FAQ_DATA'] = json.load(file_object)
@@ -50,12 +56,20 @@ def _init ():
 	with open('./KnowledgeMemory/Embedding/DSSM/AttentionDSSM/SentenceEmbedding.json', 'r',
 	          encoding='utf-8') as file_object:
 		__global_dict['DSSM_FAQ_SENTENCE_EMBEDDING']['AttentionDSSM'] = json.load(file_object)
+
+	print('loading PRETRAINED_MODEL PARAMETERS')
+	parameters = load_parameters_to_cpu(__global_dict.get('BERT_ARGS'))
+	__global_dict['NEW_STATE_DICT'] = parameters.load()
 	# </editor-fold>
 	# <editor-fold desc="Model">
 	print('loading Model DSSM')
 	__global_dict['MODEL'] = {}
 	# DSSM
 	__global_dict['MODEL']['DSSM'] = {}
+
+	print('loading QUESTION_CLASSIFICATION_MODEL')
+	predict_model = SentencePredict.PredictModel()
+	__global_dict['QUESTION_CLASSIFICATION_MODEL'] = predict_model
 
 	# 字向量字典获取
 	embedding_dict = __global_dict['Word2Vec_CHARACTER_EMBEDDING']
