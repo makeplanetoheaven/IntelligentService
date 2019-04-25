@@ -15,10 +15,10 @@ from KnowledgeMatching.SimNet.DSSM.TransformerDSSM import *
 from UtilArea import GlobalVariable
 
 # 全局变量
-dssm_model = {'MultiGruModel': MultiGruDSSM, 'AttentionDSSM': AttentionDSSM, 'TransformerDSSM':TransformerDSSM}
+dssm_model = {'MultiGruDSSM': MultiGruDSSM, 'AttentionDSSM': AttentionDSSM, 'TransformerDSSM':TransformerDSSM}
 
 
-def dssm_model_train (model_name='MultiGruModel'):
+def dssm_model_train (model_name='MultiGruDSSM'):
 	"""
 	dssm模型训练函数，从指定路径加载数据
 	:return: None
@@ -55,7 +55,7 @@ def dssm_model_train (model_name='MultiGruModel'):
 	dssm.train()
 
 
-def dssm_model_infer (queries, model_name='MultiGruModel', top_k=1, threshold=0., query_type='所有'):
+def dssm_model_infer (queries, model_name='MultiGruDSSM', top_k=1, threshold=0., query_type='所有'):
 	"""
 	dssm模型计算函数，通过参数获取问题，从指定路径加载需要匹配数据, 获取top-k个候选答案
 	并根据给定阈值过滤答案
@@ -99,7 +99,7 @@ def dssm_model_infer (queries, model_name='MultiGruModel', top_k=1, threshold=0.
 	return answer_id_list
 
 
-def dssm_model_extract_t_pre (model_name='MultiGruModel'):
+def dssm_model_extract_t_pre (model_name='MultiGruDSSM'):
 	# 匹配数据获取
 	query_dict = {'Domain': [], 'Encyclopedia': [], 'Gossip': []}
 	faq_dict = GlobalVariable.get_value('FAQ_DATA')
@@ -134,6 +134,6 @@ def dssm_model_extract_t_pre (model_name='MultiGruModel'):
 		for i in range(len(t_state)):
 			t_pre_dict[i] = list(map(float, list(t_state[i])))
 
-		with open('./KnowledgeMemory/Embedding/DSSM/+'+model_name+'/' + key + 'Embedding.json', 'w',
+		with open('./KnowledgeMemory/Embedding/DSSM/'+model_name+'/' + key + 'Embedding.json', 'w',
 		          encoding='utf-8') as file_object:
 			json.dump(t_pre_dict, file_object, ensure_ascii=False, indent=2)

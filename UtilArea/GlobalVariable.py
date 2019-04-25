@@ -9,7 +9,7 @@ function: 全局变量使用模块
 import json
 
 # 引入内部库
-from KnowledgeMatching.SimNet.DSSM.AttentionDSSM import *
+from KnowledgeMatching.SimNet.DSSM.TransformerDSSM import *
 
 # 全局变量
 __global_dict = None
@@ -38,7 +38,7 @@ def _init ():
 	index_dict = dict()
 	# Domain
 	index_dict['领域'] = []
-	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/AttentionDSSM/DomainEmbedding.json', 'r',
+	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/DomainEmbedding.json', 'r',
 	                        encoding='utf-8')
 	faq_object = open('./KnowledgeMemory/FAQ/DomainFAQ.json', 'r', encoding='utf-8')
 	domain_embedding = json.load(embedding_object)
@@ -61,7 +61,7 @@ def _init ():
 
 	# Encyclopedia
 	index_dict['百科'] = []
-	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/AttentionDSSM/EncyclopediaEmbedding.json', 'r',
+	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/EncyclopediaEmbedding.json', 'r',
 	                        encoding='utf-8')
 	faq_object = open('./KnowledgeMemory/FAQ/EncyclopediaFAQ.json', 'r', encoding='utf-8')
 	encyclopedia_embedding = json.load(embedding_object)
@@ -80,7 +80,7 @@ def _init ():
 
 	# Gossip
 	index_dict['闲聊'] = []
-	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/AttentionDSSM/GossipEmbedding.json', 'r',
+	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/GossipEmbedding.json', 'r',
 	                        encoding='utf-8')
 	faq_object = open('./KnowledgeMemory/FAQ/GossipFAQ.json', 'r', encoding='utf-8')
 	gossip_embedding = json.load(embedding_object)
@@ -108,10 +108,9 @@ def _init ():
 	# <editor-fold desc="Model">
 	print('loading Model DSSM')
 	__global_dict['MODEL'] = {}
-	# DSSM
+	# DSSM MODEL
 	__global_dict['MODEL']['DSSM'] = {}
 
-	# 字向量字典获取
 	embedding_dict = __global_dict['Word2Vec_CHARACTER_EMBEDDING']
 	word_dict = {}
 	vec_set = []
@@ -120,10 +119,10 @@ def _init ():
 		word_dict[key] = i
 		vec_set.append(embedding_dict[key][0])
 		i += 1
-	__global_dict['MODEL']['DSSM']['AttentionDSSM_INFER'] = AttentionDSSM(dict_set=word_dict, vec_set=vec_set,
+	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'] = TransformerDSSM(dict_set=word_dict, vec_set=vec_set,
 	                                                                      is_train=False)
-	__global_dict['MODEL']['DSSM']['AttentionDSSM_INFER'].build_graph()
-	__global_dict['MODEL']['DSSM']['AttentionDSSM_INFER'].start_session()
+	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'].build_graph()
+	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'].start_session()
 	# </editor-fold>
 	# <editor-fold desc="Interface">
 	print('loading Interface IO')

@@ -22,7 +22,7 @@ class TransformerDSSM:
 	              dict_set=None, # 字典集，[词：index]
 	              vec_set=None,  # 向量集，[向量]，与dict_set顺序一致
 	              batch_size=None, # 训练批次，默认是全部数据
-	              hidden_num=150,  # 隐藏层个数
+	              hidden_num=256,  # 隐藏层个数
 	              attention_num = 512, # 注意力机制的数目
 	              learning_rate=0.0001,  # 学习率
 	              epoch_steps=10,  # 训练迭代次数
@@ -162,10 +162,6 @@ class TransformerDSSM:
 
 				# hiddens的长度为2，其中每一个元素代表一个方向的隐藏状态序列，将每一时刻的输出合并成一个输出
 				structure_output = tf.concat(output, axis=2)
-
-				# skip-connect + LN
-				structure_output += inputs
-				structure_output = self.layer_normalization(structure_output)
 
 			with tf.name_scope('self_attention_layer'):
 				# q, k, v define

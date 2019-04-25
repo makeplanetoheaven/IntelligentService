@@ -17,7 +17,7 @@ from UtilArea.Csv2Json import *
 
 def test_semantic():
 	init_system()
-	dssm_model_train('TransformerDSSM')
+	dssm_model_extract_t_pre('TransformerDSSM')
 
 
 test_semantic()
