@@ -245,7 +245,7 @@ class BertForClassification:
         # 准备模型，使用预训练的bert_base_chinese模型的SequenceClassification用于分类任务
         model = BertForSequenceClassification.from_pretrained(args.get('bert_model'),
                                                               cache_dir=PYTORCH_PRETRAINED_BERT_CACHE / 'distributed_{}'.format(
-                                                                  args.get('local_rank')))
+                                                                  args.get('local_rank')), num_labels=3)
         # 是否使用16位精度提升速度
         if args.get('fp16'):
             model.half()
@@ -282,7 +282,8 @@ class BertForClassification:
                              t_total=t_total)
 
         # 开始训练
-        # 准备步骤：(1)将examples转为features
+        # 准备步骤：
+        # (1)将examples转为features
         # (2)将features中的参数加载到torch.tensor中
         # (3)使用TensorDataset将所有的featuretensor打包作为训练集数据，选择随机采样或分布式采样
         # (4)使用DataLoader将训练集加载，确定采样方式和batch_size
