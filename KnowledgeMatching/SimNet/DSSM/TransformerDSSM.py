@@ -7,13 +7,13 @@ function: 通过使用双向GRU+Transformer作为表示层进行语义相似度�
 
 # 引入外部库
 import os
-import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.contrib.rnn import GRUCell, DropoutWrapper
 
 
 # 引入内部库
+from UtilArea.Sampling import *
 
 
 class TransformerDSSM:
@@ -29,6 +29,7 @@ class TransformerDSSM:
 	              gamma=20, # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
 	              is_extract = False, # 是否进行t特征提取
+	              is_sample = False # 是否采用随机采样方法进行训练
 				  ):
 		# 外部参数
 		self.q_set = q_set
@@ -45,6 +46,7 @@ class TransformerDSSM:
 		self.gamma = gamma
 		self.is_train = is_train
 		self.is_extract = is_extract
+		self.is_sample = is_sample
 
 		# 内部参数
 		self.q_size = 0
@@ -146,10 +148,10 @@ class TransformerDSSM:
 			with tf.name_scope('structure_presentation_layer'):
 				# 正向
 				fw_cell = GRUCell(num_units=self.hidden_num)
-				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.5)
+				fw_drop_cell = DropoutWrapper(fw_cell, output_keep_prob=0.8)
 				# 反向
 				bw_cell = GRUCell(num_units=self.hidden_num)
-				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.5)
+				bw_drop_cell = DropoutWrapper(bw_cell, output_keep_prob=0.8)
 
 				# 动态rnn函数传入的是一个三维张量，[batch_size,n_steps,n_input]  输出是一个元组 每一个元素也是这种形状
 				if self.is_train and not self.is_extract:
@@ -177,7 +179,7 @@ class TransformerDSSM:
 				logits = tf.matmul(q, k, transpose_b=True)
 				weights = tf.nn.softmax(logits, name="attention_weights")
 				if self.is_train and not self.is_extract:
-					weights = tf.nn.dropout(weights, 0.5)
+					weights = tf.nn.dropout(weights, 0.8)
 				self_attention_output = tf.matmul(weights, v)
 
 				# skip-connect + LN
@@ -192,7 +194,7 @@ class TransformerDSSM:
 				# calculate
 				full_connect_output = filter_dense_layer(self_attention_output)
 				if self.is_train and not self.is_extract:
-					full_connect_output = tf.nn.dropout(full_connect_output, 0.5)
+					full_connect_output = tf.nn.dropout(full_connect_output, 0.8)
 				full_connect_output = output_dense_layer(full_connect_output)
 
 				# skip-connect + LN
@@ -343,21 +345,34 @@ class TransformerDSSM:
 
 			# 开始迭代，使用Adam优化的随机梯度下降法，并将结果输出到日志文件
 			print('training------')
+			index_list = [i for i in range(self.q_size)]
 			for i in range(self.epoch_steps):
 				total_loss = 0
 				total_accuracy = 0
 				for j in range(self.q_size // self.batch_size):
-					q_set = self.q_set[j * self.batch_size:(j + 1) * self.batch_size]
-					t_set = self.t_set[j * self.batch_size:(j + 1) * self.batch_size]
-					q_actual_length = self.q_actual_length[j * self.batch_size:(j + 1) * self.batch_size]
-					t_actual_length = self.t_actual_length[j * self.batch_size:(j + 1) * self.batch_size]
+					if self.is_sample:
+						sample_list = systematic_sampling(index_list, self.batch_size)
+						q_set = []
+						t_set = []
+						q_actual_length = []
+						t_actual_length = []
+						for index in sample_list:
+							q_set.append(self.q_set[index])
+							t_set.append(self.t_set[index])
+							q_actual_length.append(self.q_actual_length[index])
+							t_actual_length.append(self.t_actual_length[index])
+					else:
+						q_set = self.q_set[j * self.batch_size:(j + 1) * self.batch_size]
+						t_set = self.t_set[j * self.batch_size:(j + 1) * self.batch_size]
+						q_actual_length = self.q_actual_length[j * self.batch_size:(j + 1) * self.batch_size]
+						t_actual_length = self.t_actual_length[j * self.batch_size:(j + 1) * self.batch_size]
 					feed_dict = {self.q_inputs: q_set, self.q_inputs_actual_length: q_actual_length,
 					             self.t_inputs: t_set, self.t_inputs_actual_length: t_actual_length}
 					_, loss, accuracy = self.session.run([self.train_op, self.loss, self.accuracy], feed_dict=feed_dict)
 					total_loss += loss
 					total_accuracy += accuracy
-				print('[epoch:%d] loss %f accuracy %f' % (
-				i, total_loss / (self.q_size // self.batch_size), total_accuracy / (self.q_size // self.batch_size)))
+				print('[epoch:%d] loss %f accuracy %f' % (i, total_loss / (self.q_size // self.batch_size),
+				                                          total_accuracy / (self.q_size // self.batch_size)))
 
 			# 保存模型
 			print('save model------')

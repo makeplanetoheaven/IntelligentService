@@ -35,5 +35,4 @@ def test_run ():
 	init_system()
 	run()
 
-
 test_get_answer()

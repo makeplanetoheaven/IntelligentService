@@ -32,9 +32,9 @@ def dssm_model_train (model_name='MultiGruDSSM'):
 		answer_set.append(list(faq_dict[key]['答案']))
 
 	# 翻转问题，增加数据多样性，变成两个问题指向同一答案
-	for key in faq_dict:
-		query_set.append(list(faq_dict[key]['问题'])[::-1])
-		answer_set.append(list(faq_dict[key]['答案']))
+	# for key in faq_dict:
+	# 	query_set.append(list(faq_dict[key]['问题'])[::-1])
+	# 	answer_set.append(list(faq_dict[key]['答案']))
 
 	# 字向量字典获取
 	embedding_dict = GlobalVariable.get_value('Word2Vec_CHARACTER_EMBEDDING')

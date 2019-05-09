@@ -106,9 +106,8 @@ def _init ():
 		__global_dict['Word2Vec_CHARACTER_EMBEDDING'] = json.load(file_object)
 	# </editor-fold>
 	# <editor-fold desc="Model">
-	print('loading Model DSSM')
-
 	# DSSM MODEL
+	print('loading Model DSSM')
 	__global_dict['MODEL'] = {}
 	__global_dict['MODEL']['DSSM'] = {}
 	embedding_dict = __global_dict['Word2Vec_CHARACTER_EMBEDDING']
@@ -120,7 +119,7 @@ def _init ():
 		vec_set.append(embedding_dict[key][0])
 		i += 1
 	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'] = TransformerDSSM(dict_set=word_dict, vec_set=vec_set,
-	                                                                      is_train=False)
+	                                                                          is_train=False)
 	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'].build_graph()
 	__global_dict['MODEL']['DSSM']['TransformerDSSM_INFER'].start_session()
 	# </editor-fold>
