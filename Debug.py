@@ -6,7 +6,6 @@ function: 用于运行控制模块的调试
 """
 
 # 引入外部库
-import pandas as pd
 import json
 import numpy as np
 import time
@@ -36,3 +35,6 @@ def test_run ():
 	run()
 
 test_get_answer()
+# init_system()
+# dssm_model_extract_t_pre('TransformerDSSM')
+# dssm_model_train('TransformerDSSM')

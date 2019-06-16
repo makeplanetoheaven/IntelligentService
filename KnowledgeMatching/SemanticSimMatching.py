@@ -34,7 +34,7 @@ def dssm_model_train (model_name='MultiGruDSSM'):
 	# 翻转问题，增加数据多样性，变成两个问题指向同一答案
 	# for key in faq_dict:
 	# 	query_set.append(list(faq_dict[key]['问题'])[::-1])
-	# 	answer_set.append(list(faq_dict[key]['答案']))
+	# 	answer_set.append(list(faq_dict[key]['答案'])[::-1])
 
 	# 字向量字典获取
 	embedding_dict = GlobalVariable.get_value('Word2Vec_CHARACTER_EMBEDDING')
@@ -48,11 +48,11 @@ def dssm_model_train (model_name='MultiGruDSSM'):
 
 	# 模型训练
 	dssm = dssm_model[model_name](q_set=query_set, t_set=answer_set, dict_set=word_dict, vec_set=vec_set,
-	                              batch_size=len(query_set) // 2)
+	                              batch_size=80, is_sample=True)
 	dssm.init_model_parameters()
 	dssm.generate_data_set()
-	dssm.build_graph()
-	dssm.train()
+	dssm.build_graph_by_gpu(4)
+	dssm.train(4)
 
 
 def dssm_model_infer (queries, model_name='MultiGruDSSM', top_k=1, threshold=0., query_type='所有'):
@@ -101,7 +101,8 @@ def dssm_model_infer (queries, model_name='MultiGruDSSM', top_k=1, threshold=0.,
 
 def dssm_model_extract_t_pre (model_name='MultiGruDSSM'):
 	# 匹配数据获取
-	query_dict = {'Domain': [], 'Encyclopedia': [], 'Gossip': []}
+	# query_dict = {'Domain': [], 'Encyclopedia': [], 'Gossip': []}
+	query_dict = {'Domain': []}
 	faq_dict = GlobalVariable.get_value('FAQ_DATA')
 	for key in faq_dict:
 		if faq_dict[key]['专业'] == '百科':
@@ -126,7 +127,7 @@ def dssm_model_extract_t_pre (model_name='MultiGruDSSM'):
 		dssm = dssm_model[model_name](t_set=query_dict[key], dict_set=word_dict, vec_set=vec_set, is_extract=True)
 		dssm.init_model_parameters()
 		dssm.generate_data_set()
-		dssm.build_graph()
+		dssm.build_graph_by_cpu()
 		t_state = dssm.extract_t_pre()
 
 		# 匹配数据对应特征向量的存储
