@@ -18,7 +18,7 @@ from UtilArea import GlobalVariable
 dssm_model = {'MultiGruDSSM': MultiGruDSSM, 'AttentionDSSM': AttentionDSSM, 'TransformerDSSM':TransformerDSSM}
 
 
-def dssm_model_train (model_name='MultiGruDSSM'):
+def dssm_model_train (model_name='MultiGruDSSM', method='cpu', gpu_num=1):
 	"""
 	dssm模型训练函数，从指定路径加载数据
 	:return: None
@@ -51,8 +51,11 @@ def dssm_model_train (model_name='MultiGruDSSM'):
 	                              batch_size=80, is_sample=True)
 	dssm.init_model_parameters()
 	dssm.generate_data_set()
-	dssm.build_graph_by_gpu(4)
-	dssm.train(4)
+	if method == 'cpu':
+		dssm.build_graph_by_cpu()
+	else:
+		dssm.build_graph_by_gpu(gpu_num)
+	dssm.train(gpu_num)
 
 
 def dssm_model_infer (queries, model_name='MultiGruDSSM', top_k=1, threshold=0., query_type='所有'):

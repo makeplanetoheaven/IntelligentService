@@ -270,12 +270,12 @@ class TransformerDSSM:
 					else:
 						cos_sim = self.matching_layer_infer(q_final_state, self.t_final_state)
 
+				# softmax归一化并输出
+				prob = tf.nn.softmax(cos_sim)
 				if not self.is_train:
 					self.top_k_answer = tf.placeholder(dtype=tf.int32)
-					self.outputs_prob, self.outputs_index = tf.nn.top_k(cos_sim, self.top_k_answer)
+					self.outputs_prob, self.outputs_index = tf.nn.top_k(prob, self.top_k_answer)
 				else:
-					# softmax归一化并输出
-					prob = tf.nn.softmax(cos_sim)
 					with tf.name_scope('Loss'):
 						# 取正样本
 						hit_prob = tf.slice(prob, [0, 0], [-1, 1])
