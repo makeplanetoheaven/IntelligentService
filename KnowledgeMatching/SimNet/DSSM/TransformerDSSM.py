@@ -25,7 +25,7 @@ class TransformerDSSM:
 	              hidden_num=256,  # 隐藏层个数
 	              attention_num=512,  # 注意力机制的数目
 	              learning_rate=0.0001,  # 学习率
-	              epoch_steps=200,  # 训练迭代次数
+	              epoch_steps=20,  # 训练迭代次数
 	              gamma=20,  # 余弦相似度平滑因子
 	              is_train=True,  # 是否进行训练
 	              is_extract=False,  # 是否进行t特征提取
@@ -232,69 +232,70 @@ class TransformerDSSM:
 		# 构建模型训练所需的数据流图
 		self.graph = tf.Graph()
 		with self.graph.as_default():
-			with tf.name_scope('placeholder'):
-				# 定义Q输入
-				if not self.is_extract:
-					self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, None])
-					self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
+			with tf.device("/cpu:0"):
+				with tf.name_scope('placeholder'):
+					# 定义Q输入
+					if not self.is_extract:
+						self.q_inputs = tf.placeholder(dtype=tf.int64, shape=[None, None])
+						self.q_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
 
-				# 定义T输入
-				if self.is_train:
-					self.t_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.t_max_length])
-					self.t_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
-
-			with tf.name_scope('InputLayer'):
-				# 定义词向量
-				embeddings = tf.constant(self.vec_set)
-
-				# 将句子中的每个字转换为字向量
-				if not self.is_extract:
-					q_embeddings = tf.nn.embedding_lookup(embeddings, self.q_inputs)
-				if self.is_train:
-					t_embeddings = tf.nn.embedding_lookup(embeddings, self.t_inputs)
-
-			with tf.name_scope('PresentationLayer'):
-				if not self.is_extract:
-					q_final_state = self.presentation_transformer(q_embeddings, self.q_inputs_actual_length)
-				if self.is_train and self.is_extract:
-					self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length)
-				elif self.is_train:
-					self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length)
-				else:
-					self.t_final_state = tf.placeholder(dtype=tf.float32, shape=[None, self.hidden_num * 2])
-
-			if not self.is_extract:
-				with tf.name_scope('MatchingLayer'):
+					# 定义T输入
 					if self.is_train:
-						cos_sim = self.matching_layer_training(q_final_state, self.t_final_state)
+						self.t_inputs = tf.placeholder(dtype=tf.int64, shape=[None, self.t_max_length])
+						self.t_inputs_actual_length = tf.placeholder(dtype=tf.int32, shape=[None])
+
+				with tf.name_scope('InputLayer'):
+					# 定义词向量
+					embeddings = tf.constant(self.vec_set)
+
+					# 将句子中的每个字转换为字向量
+					if not self.is_extract:
+						q_embeddings = tf.nn.embedding_lookup(embeddings, self.q_inputs)
+					if self.is_train:
+						t_embeddings = tf.nn.embedding_lookup(embeddings, self.t_inputs)
+
+				with tf.name_scope('PresentationLayer'):
+					if not self.is_extract:
+						q_final_state = self.presentation_transformer(q_embeddings, self.q_inputs_actual_length)
+					if self.is_train and self.is_extract:
+						self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length)
+					elif self.is_train:
+						self.t_final_state = self.presentation_transformer(t_embeddings, self.t_inputs_actual_length)
 					else:
-						cos_sim = self.matching_layer_infer(q_final_state, self.t_final_state)
+						self.t_final_state = tf.placeholder(dtype=tf.float32, shape=[None, self.hidden_num * 2])
 
-				# softmax归一化并输出
-				prob = tf.nn.softmax(cos_sim)
-				if not self.is_train:
-					self.top_k_answer = tf.placeholder(dtype=tf.int32)
-					self.outputs_prob, self.outputs_index = tf.nn.top_k(prob, self.top_k_answer)
-				else:
-					with tf.name_scope('Loss'):
-						# 取正样本
-						hit_prob = tf.slice(prob, [0, 0], [-1, 1])
-						self.loss = -tf.reduce_sum(tf.log(hit_prob)) / self.batch_size
+				if not self.is_extract:
+					with tf.name_scope('MatchingLayer'):
+						if self.is_train:
+							cos_sim = self.matching_layer_training(q_final_state, self.t_final_state)
+						else:
+							cos_sim = self.matching_layer_infer(q_final_state, self.t_final_state)
 
-					with tf.name_scope('Accuracy'):
-						output_train = tf.argmax(prob, axis=1)
-						self.accuracy = tf.reduce_sum(tf.cast(tf.equal(output_train, tf.zeros_like(output_train)),
-						                                      dtype=tf.float32)) / self.batch_size
+					# softmax归一化并输出
+					prob = tf.nn.softmax(cos_sim)
+					if not self.is_train:
+						self.top_k_answer = tf.placeholder(dtype=tf.int32)
+						self.outputs_prob, self.outputs_index = tf.nn.top_k(prob, self.top_k_answer)
+					else:
+						with tf.name_scope('Loss'):
+							# 取正样本
+							hit_prob = tf.slice(prob, [0, 0], [-1, 1])
+							self.loss = -tf.reduce_sum(tf.log(hit_prob)) / self.batch_size
 
-					# 优化并进行梯度修剪
-					with tf.name_scope('Train'):
-						optimizer = tf.train.AdamOptimizer(self.learning_rate)
-						# 分解成梯度列表和变量列表
-						grads, vars = zip(*optimizer.compute_gradients(self.loss))
-						# 梯度修剪
-						gradients, _ = tf.clip_by_global_norm(grads, 5)  # clip gradients
-						# 将每个梯度以及对应变量打包
-						self.train_op = optimizer.apply_gradients(zip(gradients, vars))
+						with tf.name_scope('Accuracy'):
+							output_train = tf.argmax(prob, axis=1)
+							self.accuracy = tf.reduce_sum(tf.cast(tf.equal(output_train, tf.zeros_like(output_train)),
+							                                      dtype=tf.float32)) / self.batch_size
+
+						# 优化并进行梯度修剪
+						with tf.name_scope('Train'):
+							optimizer = tf.train.AdamOptimizer(self.learning_rate)
+							# 分解成梯度列表和变量列表
+							grads, vars = zip(*optimizer.compute_gradients(self.loss))
+							# 梯度修剪
+							gradients, _ = tf.clip_by_global_norm(grads, 5)  # clip gradients
+							# 将每个梯度以及对应变量打包
+							self.train_op = optimizer.apply_gradients(zip(gradients, vars))
 
 			# 设置模型存储所需参数
 			self.saver = tf.train.Saver()
@@ -340,7 +341,6 @@ class TransformerDSSM:
 									q_final_state = self.presentation_transformer(_q_embeddings, q_inputs_actual_length)
 									t_final_state = self.presentation_transformer(_t_embeddings, t_inputs_actual_length)
 
-
 								with tf.name_scope('MatchingLayer'):
 									cos_sim = self.matching_layer_training(q_final_state, t_final_state)
 
@@ -354,8 +354,9 @@ class TransformerDSSM:
 
 								with tf.name_scope('Accuracy'):
 									output_train = tf.argmax(prob, axis=1)
-									cur_accuracy = tf.reduce_sum(tf.cast(tf.equal(output_train, tf.zeros_like(output_train)),
-									                                      dtype=tf.float32)) / self.batch_size
+									cur_accuracy = tf.reduce_sum(
+										tf.cast(tf.equal(output_train, tf.zeros_like(output_train)),
+										        dtype=tf.float32)) / self.batch_size
 									accuracy_list.append(cur_accuracy)
 
 								# 优化并进行梯度修剪
@@ -416,7 +417,7 @@ class TransformerDSSM:
 					total_loss += loss
 					total_accuracy += accuracy
 				print('[epoch:%d] loss %f accuracy %f' % (
-				i, total_loss / (self.q_size // sample_nums), total_accuracy / (self.q_size // sample_nums)))
+					i, total_loss / (self.q_size // sample_nums), total_accuracy / (self.q_size // sample_nums)))
 
 			# 保存模型
 			print('save model------')
@@ -450,15 +451,12 @@ class TransformerEncoder(tf.layers.Layer):
 		super(TransformerEncoder, self).__init__()
 		self.layers = []
 		for _ in range(params["num_layers"]):
-			self_attention_layer = SelfAttention(params["hidden_size"], params["num_heads"],
-				params["dropout"])
+			self_attention_layer = SelfAttention(params["hidden_size"], params["num_heads"], params["dropout"])
 			feed_forward_network = FeedFowardNetwork(params["hidden_size"], params["dropout"])
 
-			self.layers.append([LayNormAdd(self_attention_layer, params),
-			                    LayNormAdd(feed_forward_network, params)])
+			self.layers.append([LayNormAdd(self_attention_layer, params), LayNormAdd(feed_forward_network, params)])
 
 		self.output_normalization = LayerNormalization(params["hidden_size"])
-
 
 	def call (self, encoder_inputs, training):
 		for n, layer in enumerate(self.layers):

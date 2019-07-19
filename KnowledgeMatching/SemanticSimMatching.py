@@ -104,8 +104,7 @@ def dssm_model_infer (queries, model_name='MultiGruDSSM', top_k=1, threshold=0.,
 
 def dssm_model_extract_t_pre (model_name='MultiGruDSSM'):
 	# 匹配数据获取
-	# query_dict = {'Domain': [], 'Encyclopedia': [], 'Gossip': []}
-	query_dict = {'Domain': []}
+	query_dict = {'Domain': [], 'Encyclopedia': [], 'Gossip': []}
 	faq_dict = GlobalVariable.get_value('FAQ_DATA')
 	for key in faq_dict:
 		if faq_dict[key]['专业'] == '百科':

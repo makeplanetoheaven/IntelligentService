@@ -60,42 +60,42 @@ def _init ():
 	faq_object.close()
 
 	# Encyclopedia
-	# index_dict['百科'] = []
-	# embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/EncyclopediaEmbedding.json', 'r',
-	#                         encoding='utf-8')
-	# faq_object = open('./KnowledgeMemory/FAQ/EncyclopediaFAQ.json', 'r', encoding='utf-8')
-	# encyclopedia_embedding = json.load(embedding_object)
-	# encyclopedia_faq = json.load(faq_object)
-	# for i in range(len(encyclopedia_faq)):
-	# 	__global_dict['FAQ_DATA'][index] = {}
-	# 	__global_dict['FAQ_DATA'][index]['专业'] = encyclopedia_faq[i]['专业']
-	# 	if str(i) in encyclopedia_embedding:
-	# 		__global_dict['FAQ_DATA'][index]['embedding'] = encyclopedia_embedding[str(i)]
-	# 	__global_dict['FAQ_DATA'][index]['问题'] = encyclopedia_faq[i]['问题']
-	# 	__global_dict['FAQ_DATA'][index]['答案'] = encyclopedia_faq[i]['答案']
-	# 	index_dict['百科'].append(index)
-	# 	index += 1
-	# embedding_object.close()
-	# faq_object.close()
+	index_dict['百科'] = []
+	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/EncyclopediaEmbedding.json', 'r',
+	                        encoding='utf-8')
+	faq_object = open('./KnowledgeMemory/FAQ/EncyclopediaFAQ.json', 'r', encoding='utf-8')
+	encyclopedia_embedding = json.load(embedding_object)
+	encyclopedia_faq = json.load(faq_object)
+	for i in range(len(encyclopedia_faq)):
+		__global_dict['FAQ_DATA'][index] = {}
+		__global_dict['FAQ_DATA'][index]['专业'] = encyclopedia_faq[i]['专业']
+		if str(i) in encyclopedia_embedding:
+			__global_dict['FAQ_DATA'][index]['embedding'] = encyclopedia_embedding[str(i)]
+		__global_dict['FAQ_DATA'][index]['问题'] = encyclopedia_faq[i]['问题']
+		__global_dict['FAQ_DATA'][index]['答案'] = encyclopedia_faq[i]['答案']
+		index_dict['百科'].append(index)
+		index += 1
+	embedding_object.close()
+	faq_object.close()
 
 	# Gossip
-	# index_dict['闲聊'] = []
-	# embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/GossipEmbedding.json', 'r',
-	#                         encoding='utf-8')
-	# faq_object = open('./KnowledgeMemory/FAQ/GossipFAQ.json', 'r', encoding='utf-8')
-	# gossip_embedding = json.load(embedding_object)
-	# gossip_faq = json.load(faq_object)
-	# for i in range(len(gossip_faq)):
-	# 	__global_dict['FAQ_DATA'][index] = {}
-	# 	__global_dict['FAQ_DATA'][index]['专业'] = gossip_faq[i]['专业']
-	# 	if str(i) in gossip_embedding:
-	# 		__global_dict['FAQ_DATA'][index]['embedding'] = gossip_embedding[str(i)]
-	# 	__global_dict['FAQ_DATA'][index]['问题'] = gossip_faq[i]['问题']
-	# 	__global_dict['FAQ_DATA'][index]['答案'] = gossip_faq[i]['答案']
-	# 	index_dict['闲聊'].append(index)
-	# 	index += 1
-	# embedding_object.close()
-	# faq_object.close()
+	index_dict['闲聊'] = []
+	embedding_object = open('./KnowledgeMemory/Embedding/DSSM/TransformerDSSM/GossipEmbedding.json', 'r',
+	                        encoding='utf-8')
+	faq_object = open('./KnowledgeMemory/FAQ/GossipFAQ.json', 'r', encoding='utf-8')
+	gossip_embedding = json.load(embedding_object)
+	gossip_faq = json.load(faq_object)
+	for i in range(len(gossip_faq)):
+		__global_dict['FAQ_DATA'][index] = {}
+		__global_dict['FAQ_DATA'][index]['专业'] = gossip_faq[i]['专业']
+		if str(i) in gossip_embedding:
+			__global_dict['FAQ_DATA'][index]['embedding'] = gossip_embedding[str(i)]
+		__global_dict['FAQ_DATA'][index]['问题'] = gossip_faq[i]['问题']
+		__global_dict['FAQ_DATA'][index]['答案'] = gossip_faq[i]['答案']
+		index_dict['闲聊'].append(index)
+		index += 1
+	embedding_object.close()
+	faq_object.close()
 
 	print('loading Data FAQ_INDEX')
 	index_dict['所有'] = [i for i in range(len(__global_dict['FAQ_DATA']))]

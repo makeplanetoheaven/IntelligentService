@@ -37,4 +37,4 @@ def test_run ():
 test_get_answer()
 # init_system()
 # dssm_model_extract_t_pre('TransformerDSSM')
-# dssm_model_train('TransformerDSSM')
+# dssm_model_train('TransformerDSSM', method='gpu', gpu_num=4)
